@@ -68,8 +68,8 @@ void setup() {
     while (1);
   }
   
-  //mma.setRange(MMA8451_RANGE_2_G);  // set acc range (2 5 8)
-  //Serial.print("Acc range "); Serial.print(2 << mma.getRange()); Serial.println("G");
+  mma.setRange(MMA8451_RANGE_8_G);  // set acc range (2 5 8)
+  Serial.print("Acc range "); Serial.print(2 << mma.getRange()); Serial.println("G");
    
   //--------------set up RTC-------------------  
    
