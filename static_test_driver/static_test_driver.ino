@@ -44,6 +44,13 @@ char data_name[20] = "";
 // Logging
 char filename[] = "DATA000.csv";
 
+// Autonomous control
+#define COUNTDOWN_DURATION 60000
+
+bool auto_running = false;
+bool engine_start = false;
+long start_time = 0;
+
 void setup() {
   //------------- set up temp sensor-----------
   Serial.begin(9600);
@@ -103,6 +110,31 @@ void loop() {
   
   x=event.acceleration.x;  y=event.acceleration.y;  z=event.acceleration.z;
   //storeData(force_reading, tempc, x, y, z);
+
+  /* Run autonoumous control */
+  // Get a throttle setting, throttle the engine
+  
+  if (auto_running) {
+    long run_time = millis() - start_time;
+    SEND(run_time, run_time)
+
+    if (run_time < COUNTDOWN_DURATION) {
+      SEND(countdown, (COUNTDOWN_DURATION - run_time) / 60)
+    }
+    else if (!engine_start) {
+      // Start engine
+      
+    }
+    /*else if (thrust > whatever) {//TODO
+      // Check for problems, shut down if needed
+    }*/
+    else {
+      // Shutdown engine
+      
+      auto_running = false;
+      start_time = 0;
+    }
+  }
   
   SEND(force, force_reading)
   SEND(x, x)
@@ -122,6 +154,14 @@ void loop() {
     else {
       Serial.println("Zero err");
     }
+  }
+  READ_FLAG(start) {
+    auto_running = true;
+    start_time = millis();
+  }
+  READ_FLAG(stop) {
+    auto_running = false;
+    start_time = 0;
   }
   READ_DEFAULT(data_name, data) {
     Serial.print("Invalid: ");
