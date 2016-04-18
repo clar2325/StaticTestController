@@ -44,16 +44,10 @@ char data_name[20] = "";
 // Logging
 char filename[] = "DATA000.csv";
 
-// Autonomous control
-#define COUNTDOWN_DURATION 60000
-
-bool auto_running = false;
-bool engine_start = false;
-long start_time = 0;
-
 void setup() {
   //------------- set up temp sensor-----------
   Serial.begin(9600);
+  Serial.println("Initializing...");
   sensors.begin();
 
   byte addr[8];
@@ -73,11 +67,11 @@ void setup() {
   //-------------set up accelerometer---------------
   if (!mma.begin()) {
     Serial.println("Acc error");
-    while (1);
+    //while (1);
   }
   
   //mma.setRange(MMA8451_RANGE_2_G);  // set acc range (2 5 8)
-  //Serial.print("Acc range "); Serial.print(2 << mma.getRange()); Serial.println("G");
+  Serial.print("Acc range "); Serial.print(2 << mma.getRange()); Serial.println("G");
   
   Wire.begin();
 }
@@ -114,27 +108,7 @@ void loop() {
   /* Run autonoumous control */
   // Get a throttle setting, throttle the engine
   
-  if (auto_running) {
-    long run_time = millis() - start_time;
-    SEND(run_time, run_time)
-
-    if (run_time < COUNTDOWN_DURATION) {
-      SEND(countdown, (COUNTDOWN_DURATION - run_time) / 60)
-    }
-    else if (!engine_start) {
-      // Start engine
-      
-    }
-    /*else if (thrust > whatever) {//TODO
-      // Check for problems, shut down if needed
-    }*/
-    else {
-      // Shutdown engine
-      
-      auto_running = false;
-      start_time = 0;
-    }
-  }
+  run_control();
   
   SEND(force, force_reading)
   SEND(x, x)
@@ -156,12 +130,10 @@ void loop() {
     }
   }
   READ_FLAG(start) {
-    auto_running = true;
-    start_time = millis();
+    start_autosequence();
   }
   READ_FLAG(stop) {
-    auto_running = false;
-    start_time = 0;
+    abort_autosequence();
   }
   READ_DEFAULT(data_name, data) {
     Serial.print("Invalid: ");
