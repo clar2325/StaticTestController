@@ -5,6 +5,7 @@
 #define RUN_TIME  30000
 #define COOLDOWN_TIME 60000 * 5
 
+// TODO: I don't know if we need more states?  
 enum state {
   MANUAL_CONTROL,
   TERMINAL_COUNT,
@@ -13,6 +14,7 @@ enum state {
   COOL_DOWN
 };
 
+// TODO: I (Lucas) will this functionallity to the GUI side...
 char *convert_name(char *n) {
   for (int i = 1; i < strlen(n); i++) {
     if (n[i] == '_')
@@ -53,7 +55,7 @@ void abort_autosequence() {
       throttle(0);
       close_safety();
       break;
-    // etc
+    // etc, TODO
   }
 }
 
@@ -63,7 +65,8 @@ void run_control() {
   else {
     long run_time = millis() - start_time - COUNTDOWN_DURATION;
     SEND(run_time, run_time)
-  
+
+    // TODO: There should be a lot more here, also checking if things went wrong
     switch (state) {
       case TERMINAL_COUNT:
         if (run_time >= SAFETY_TIME) {
@@ -84,6 +87,7 @@ void run_control() {
         if (run_time >= RUN_TIME) {
           SET_STATE(COOL_DOWN)
           throttle(0);
+          close_safety();
         }
         break;
       
@@ -99,6 +103,6 @@ void run_control() {
 }
 
 void run_manual_control() {
-  // TODO
+  // TODO: Read and update throttle settings
 }
 

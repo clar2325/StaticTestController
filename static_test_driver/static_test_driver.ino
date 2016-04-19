@@ -67,7 +67,7 @@ void setup() {
   //-------------set up accelerometer---------------
   if (!mma.begin()) {
     Serial.println("Acc error");
-    //while (1);
+    //while (1); // Commented out for testing purpouses
   }
   
   //mma.setRange(MMA8451_RANGE_2_G);  // set acc range (2 5 8)
