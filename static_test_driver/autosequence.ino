@@ -14,20 +14,10 @@ enum state {
   COOL_DOWN
 };
 
-// TODO: I (Lucas) will this functionallity to the GUI side...
-char *convert_name(char *n) {
-  for (int i = 1; i < strlen(n); i++) {
-    if (n[i] == '_')
-      n[i] = ' ';
-    else
-      n[i] = tolower(n[i]);
-  }
-  return n;
-}
-
-#define SET_STATE(STATE) {           \
-  state = STATE;                     \
-  SEND(status, convert_name(#STATE));\
+// Convinence
+#define SET_STATE(STATE) {\
+  state = STATE;          \
+  SEND(status, #STATE);   \
 }
 
 long start_time = 0;
@@ -47,13 +37,16 @@ void abort_autosequence() {
       SET_STATE(MANUAL_CONTROL)
       break;
     case ENGINE_READY:
-      close_safety();
+      fuel_safety(false);
+      oxy_safety(false);
       SET_STATE(MANUAL_CONTROL)
       break;
     case ENGINE_RUNNING:
       SET_STATE(COOL_DOWN)
-      throttle(0);
-      close_safety();
+      fuel_throttle(0);
+      oxy_throttle(0);
+      fuel_safety(false);
+      oxy_safety(false);
       break;
     // etc, TODO
   }
@@ -71,14 +64,16 @@ void run_control() {
       case TERMINAL_COUNT:
         if (run_time >= SAFETY_TIME) {
           SET_STATE(ENGINE_READY)
-          open_safety();
+          fuel_safety(true);
+          oxy_safety(true);
         }
         break;
         
       case ENGINE_READY:
         if (run_time >= START_TIME) {
           SET_STATE(ENGINE_RUNNING)
-          throttle(10);
+          fuel_throttle(10);
+          oxy_throttle(10);
           fire_ignitor();
         }
         break;
@@ -86,8 +81,10 @@ void run_control() {
       case ENGINE_RUNNING:
         if (run_time >= RUN_TIME) {
           SET_STATE(COOL_DOWN)
-          throttle(0);
-          close_safety();
+          fuel_throttle(0);
+          oxy_throttle(0);
+          fuel_safety(false);
+          oxy_safety(false);
         }
         break;
       
