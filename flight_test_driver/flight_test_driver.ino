@@ -134,10 +134,10 @@ void loop() {
 
 
   // --------------Grab Tempdata------------------------ 
-  sensors.requestTemperatures();                        // Send the command to get temperatures
+  /*sensors.requestTemperatures();                        // Send the command to get temperatures
   tempc = sensors.getTempCByIndex(0);                   // Why "byIndex"? You can have more than one IC on the same bus. 
                                                         // 0 refers to the first IC on the wire
-  SEND(temperature, tempc)
+  SEND(temperature, tempc)*/
   
   /* ---Get a new sensor event */ 
   sensors_event_t event;
