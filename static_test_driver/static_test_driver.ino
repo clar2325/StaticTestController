@@ -8,6 +8,7 @@
 //#include "RTClib.h"
 #include <Adafruit_MMA8451.h>
 #include <Adafruit_Sensor.h>
+#define NUM_TEMP_SENSORS 2
 #define ONE_WIRE_BUS 2                              // Data wire is plugged into pin 2 on the Arduino
 OneWire oneWire(ONE_WIRE_BUS);                      // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 DallasTemperature sensors(&oneWire);                // Pass our oneWire reference to Dallas Temperature.
@@ -15,7 +16,7 @@ DallasTemperature sensors(&oneWire);                // Pass our oneWire referenc
 //RTC_DS1307 RTC;
 Adafruit_MMA8451 mma = Adafruit_MMA8451();
 const int chipSelect=10;                            // Use digital pin 10 as the slave select pin (SPI bus).
-float tempc=0,x=0,y=0,z=0;
+float temp[NUM_TEMP_SENSORS]={0, 0},x=0,y=0,z=0;
 
 // This is the information on the sensor being used. 
 // See the www.vernier.com/products/sensors.
@@ -50,19 +51,22 @@ void setup() {
   Serial.println("Initializing...");
   sensors.begin();
 
-  byte addr[8];
-  oneWire.search(addr); // address on 1wire bus
-
-  oneWire.reset();             // rest 1-Wire
-  oneWire.select(addr);        // select DS18B20
-
-  oneWire.write(0x4E);         // write on scratchPad
-  oneWire.write(0x00);         // User byte 0 - Unused
-  oneWire.write(0x00);         // User byte 1 - Unused
-  oneWire.write(0x1F);         // set up 9 bits (0x1F)
-
-  oneWire.reset();             // reset 1-Wire
-  //Serial.println("Temperature in degree celsius, ");
+  byte addr[8][NUM_TEMP_SENSORS];
+  for (int i = 0; i < NUM_TEMP_SENSORS; i++) {
+    oneWire.search(addr[i]); // address on 1wire bus
+  
+    oneWire.reset();             // rest 1-Wire
+    oneWire.select(addr[i]);     // select DS18B20
+  
+    oneWire.write(0x4E);         // write on scratchPad
+    oneWire.write(0x00);         // User byte 0 - Unused
+    oneWire.write(0x00);         // User byte 1 - Unused
+    oneWire.write(0x1F);         // set up 9 bits (0x1F)
+  
+    oneWire.reset();             // reset 1-Wire
+  }
+  sensors.setWaitForConversion(false);
+  sensors.requestTemperatures();
 
   //-------------set up accelerometer---------------
   if (!mma.begin()) {
@@ -76,7 +80,10 @@ void setup() {
   Wire.begin();
 }
 
+unsigned long loops = 0;
 void loop() {
+  loops++;
+  
   float count = analogRead(A0);
   float voltage = count / 1023 * 5.0;// convert from count to raw voltage
   float force_reading = intercept + voltage * slope; //converts voltage to sensor reading
@@ -90,15 +97,24 @@ void loop() {
 
 
   // --------------Grab Tempdata------------------------ 
-  sensors.requestTemperatures();                        // Send the command to get temperatures
-  tempc = sensors.getTempCByIndex(0);                   // Why "byIndex"? You can have more than one IC on the same bus. 
-                                                        // 0 refers to the first IC on the wire
-  SEND(temperature, tempc)
+  // Why "byIndex"? You can have more than one IC on the same bus. 
+
+  // Temp sensors are slow, so alternate taking data and sending a request each loop
+  if (loops % 2) {
+    for (int i = 0; i < NUM_TEMP_SENSORS; i++) {
+      temp[i] = sensors.getTempCByIndex(i);
+    }
+    SEND(inlet_temperature,  temp[0])
+    SEND(outlet_temperature, temp[1])    
+  }
+  else {
+    // Send the command to get temperatures for the next loop
+    sensors.requestTemperatures();
+  }
   
   /* ---Get a new sensor event */ 
   sensors_event_t event;
   mma.getEvent(&event);
-
 
   /*---------- Display the results (acceleration is measured in m/s^2) */ 
   
