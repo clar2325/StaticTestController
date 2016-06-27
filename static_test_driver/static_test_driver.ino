@@ -97,19 +97,20 @@ void loop() {
 
 
   // --------------Grab Tempdata------------------------ 
-  // Why "byIndex"? You can have more than one IC on the same bus. 
 
-  // Temp sensors are slow, so alternate taking data and sending a request each loop
-  if (loops % 2) {
-    for (int i = 0; i < NUM_TEMP_SENSORS; i++) {
-      temp[i] = sensors.getTempCByIndex(i);
-    }
-    SEND(inlet_temperature,  temp[0])
-    SEND(outlet_temperature, temp[1])    
-  }
-  else {
-    // Send the command to get temperatures for the next loop
-    sensors.requestTemperatures();
+  // Temp sensors are slow, so alternate taking data from each sensor each loop
+  int i = loops % NUM_TEMP_SENSORS;
+  // Why "byIndex"? You can have more than one IC on the same bus. 
+  temp[i] = sensors.getTempCByIndex(i);
+  switch (i) {
+    case 0:
+      SEND(inlet_temperature,  temp[0])
+      break;
+    case 1:
+      SEND(outlet_temperature, temp[1])
+      // Send the command to get temperatures for the next loop
+      sensors.requestTemperatures();
+      break;
   }
   
   /* ---Get a new sensor event */ 
