@@ -47,7 +47,7 @@ char filename[] = "DATA000.csv";
 
 void setup() {
   //------------- set up temp sensor-----------
-  Serial.begin(9600);
+  Serial.begin(230400);
   Serial.println("Initializing...");
   sensors.begin();
 
