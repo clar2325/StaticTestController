@@ -43,7 +43,7 @@ char data[10] = "";
 char data_name[20] = "";
 
 // Logging
-char filename[] = "DATA000.csv";
+//char filename[] = "DATA000.csv";
 
 void setup() {
   //------------- set up temp sensor-----------
@@ -126,11 +126,13 @@ void loop() {
   // Get a throttle setting, throttle the engine
   
   run_control();
-  
-  SEND(force, force_reading)
-  SEND(x, x)
-  SEND(y, y)
-  SEND(z, z)
+
+  BEGIN_SEND
+  SEND_ITEM(force, force_reading)
+  SEND_ITEM(x, x)
+  SEND_ITEM(y, y)
+  SEND_ITEM(z, z)
+  END_SEND
 
   BEGIN_READ
   READ_FLAG(zero) {

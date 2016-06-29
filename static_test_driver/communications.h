@@ -3,16 +3,36 @@
 
 // This just works, OK?
 
-#define SEND(field, value) {\
-  Serial.print("@@@@@");    \
-  Serial.print(millis());   \
-  Serial.print(":");        \
-  Serial.print(#field);     \
-  Serial.print(":");        \
-  Serial.print(value);      \
-  Serial.println("&&&&&");  \
-  Serial.flush();           \
+#define BEGIN_SEND {            \
+  Serial.print("@@@@@_time:");  \
+  Serial.print(millis());
+  
+#define SEND_ITEM(field, value) \
+  Serial.print(";");            \
+  Serial.print(#field);         \
+  Serial.print(":");            \
+  Serial.print(value);
+  
+#define SEND_ITEM_NAME(field, value)\
+  Serial.print(";");            \
+  Serial.print(field);          \
+  Serial.print(":");            \
+  Serial.print(value);
+
+#define END_SEND                \
+  Serial.println("&&&&&");      \
+  Serial.flush();               \
 }
+
+#define SEND(field, value)      \
+  BEGIN_SEND                    \
+  SEND_ITEM(field, value)       \
+  END_SEND
+
+#define SEND_NAME(field, value) \
+  BEGIN_SEND                    \
+  SEND_ITEM_NAME(field, value)  \
+  END_SEND
 
 #define READ_BUFFER_SIZE 50
 char _buffer[READ_BUFFER_SIZE];
@@ -45,11 +65,14 @@ char _data[READ_BUFFER_SIZE - 10];
       if (_c == '\r') _i--;                 \
     }                                       \
     _buffer[_i] = '\0';                     \
-    if (!sscanf(_buffer, "@@@@@:%[^&]&&&&&\n", _data)) {\
+    if (!sscanf(_buffer, "@@@@@%[^&]&&&&&\n", _data)) {\
       Serial.println("READ packet error");  \
       goto L_ENDREAD;                       \
     }                                       \
     if (0);
+/*
+    char *_item;                            \
+    while ((_item = strsep((char**)&_data, ";")) != NULL) {\*/
 
 #define READ_FIELD(field, spec)   \
   else if (sscanf(_data, #field":"spec, &field))
