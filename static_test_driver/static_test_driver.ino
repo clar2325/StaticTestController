@@ -129,9 +129,9 @@ void loop() {
 
   BEGIN_SEND
   SEND_ITEM(force, force_reading)
-  SEND_ITEM(x, x)
-  SEND_ITEM(y, y)
-  SEND_ITEM(z, z)
+  SEND_ITEM(x_acceleration, x)
+  SEND_ITEM(y_acceleration, y)
+  SEND_ITEM(z_acceleration, z)
   END_SEND
 
   BEGIN_READ
