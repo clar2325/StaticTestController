@@ -12,11 +12,13 @@
 #define ONE_WIRE_BUS 2                              // Data wire is plugged into pin 2 on the Arduino
 OneWire oneWire(ONE_WIRE_BUS);                      // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 DallasTemperature sensors(&oneWire);                // Pass our oneWire reference to Dallas Temperature.
+byte addr[8][NUM_TEMP_SENSORS];
 //File dataFile;                                      // tempFile,accFile; 
 //RTC_DS1307 RTC;
-Adafruit_MMA8451 mma = Adafruit_MMA8451();
+Adafruit_MMA8451 mma = Adafruit_MMA8451();CSV
 const int chipSelect=10;                            // Use digital pin 10 as the slave select pin (SPI bus).
 float temp[NUM_TEMP_SENSORS]={0, 0},x=0,y=0,z=0;
+bool temp_status[NUM_TEMP_SENSORS]={false, false};
 
 // This is the information on the sensor being used. 
 // See the www.vernier.com/products/sensors.
@@ -51,19 +53,21 @@ void setup() {
   Serial.println("Initializing...");
   sensors.begin();
 
-  byte addr[8][NUM_TEMP_SENSORS];
   for (int i = 0; i < NUM_TEMP_SENSORS; i++) {
     oneWire.search(addr[i]); // address on 1wire bus
   
-    oneWire.reset();             // rest 1-Wire
-    oneWire.select(addr[i]);     // select DS18B20
+    oneWire.reset();         // reset 1-Wire
+    oneWire.select(addr[i]); // select DS18B20
   
-    oneWire.write(0x4E);         // write on scratchPad
-    oneWire.write(0x00);         // User byte 0 - Unused
-    oneWire.write(0x00);         // User byte 1 - Unused
-    oneWire.write(0x1F);         // set up 9 bits (0x1F)
-  
-    oneWire.reset();             // reset 1-Wire
+    oneWire.write(0x4E);     // write on scratchPad
+    oneWire.write(0x00);     // User byte 0 - Unused
+    oneWire.write(0x00);     // User byte 1 - Unused
+    oneWire.write(0x1F);     // set up 9 bits (0x1F)
+    
+    oneWire.reset();         // reset 1-Wire
+
+    oneWire.write(0x48);     // copy scratchpad to EEPROM
+    delay(15);               // wait for end of write
   }
   sensors.setWaitForConversion(false);
   sensors.requestTemperatures();
@@ -74,7 +78,7 @@ void setup() {
     //while (1); // Commented out for testing purpouses
   }
   
-  //mma.setRange(MMA8451_RANGE_2_G);  // set acc range (2 5 8)
+  mma.setRange(MMA8451_RANGE_2_G);  // set acc range (2 5 8)
   Serial.print("Acc range "); Serial.print(2 << mma.getRange()); Serial.println("G");
   
   Wire.begin();
@@ -102,16 +106,17 @@ void loop() {
   int i = loops % NUM_TEMP_SENSORS;
   // Why "byIndex"? You can have more than one IC on the same bus. 
   temp[i] = sensors.getTempCByIndex(i);
-  switch (i) {
-    case 0:
-      SEND(inlet_temperature,  temp[0])
-      break;
-    case 1:
-      SEND(outlet_temperature, temp[1])
-      // Send the command to get temperatures for the next loop
-      sensors.requestTemperatures();
-      break;
+  if (temp[i] == -127 && temp_status[i]) {
+    Serial.println("Temp sensor err");
+    temp_status[i] = false;
   }
+  else if (temp[i] != -127 && !temp_status[i]) {
+    Serial.println("Temp sensor connected");
+    temp_status[i] = true;
+  }
+  if (i == NUM_TEMP_SENSORS - 1)
+    // Send the command to get temperatures for the next loop
+    sensors.requestTemperatures();
   
   /* ---Get a new sensor event */ 
   sensors_event_t event;
@@ -132,6 +137,14 @@ void loop() {
   SEND_ITEM(x_acceleration, x)
   SEND_ITEM(y_acceleration, y)
   SEND_ITEM(z_acceleration, z)
+  switch (i) {
+    case 0:
+      SEND_ITEM(inlet_temperature,  temp[0])
+      break;
+    case 1:
+      SEND_ITEM(outlet_temperature, temp[1])
+      break;
+  }
   END_SEND
 
   BEGIN_READ

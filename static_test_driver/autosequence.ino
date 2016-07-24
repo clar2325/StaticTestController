@@ -21,8 +21,8 @@ enum state {
 }
 
 long start_time = 0;
+long shutdown_time = 0;
 enum state state = MANUAL_CONTROL;
-
 
 void start_autosequence() {
   Serial.println("Autosequencer started");
@@ -47,6 +47,7 @@ void abort_autosequence() {
       oxy_throttle(0);
       fuel_safety(false);
       oxy_safety(false);
+      shutdown_time = millis();
       break;
     // etc, TODO
   }
@@ -85,11 +86,12 @@ void run_control() {
           oxy_throttle(0);
           fuel_safety(false);
           oxy_safety(false);
+          shutdown_time = millis();
         }
         break;
       
       case COOL_DOWN:
-        if (run_time >= COOLDOWN_TIME) {
+        if (millis() - shutdown_time >= COOLDOWN_TIME) {
           Serial.println("Autosequencer finished");
           SET_STATE(MANUAL_CONTROL)
           start_time = 0;
