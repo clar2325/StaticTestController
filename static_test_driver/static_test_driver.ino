@@ -1,5 +1,3 @@
-#include "communications.h"
-
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <SPI.h>
@@ -8,6 +6,8 @@
 //#include "RTClib.h"
 #include <Adafruit_MMA8451.h>
 #include <Adafruit_Sensor.h>
+#include <Telemetry.h>
+
 #define NUM_TEMP_SENSORS 2
 #define ONE_WIRE_BUS 2                              // Data wire is plugged into pin 2 on the Arduino
 OneWire oneWire(ONE_WIRE_BUS);                      // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
@@ -15,7 +15,7 @@ DallasTemperature sensors(&oneWire);                // Pass our oneWire referenc
 byte addr[8][NUM_TEMP_SENSORS];
 //File dataFile;                                      // tempFile,accFile; 
 //RTC_DS1307 RTC;
-Adafruit_MMA8451 mma = Adafruit_MMA8451();CSV
+Adafruit_MMA8451 mma = Adafruit_MMA8451();
 const int chipSelect=10;                            // Use digital pin 10 as the slave select pin (SPI bus).
 float temp[NUM_TEMP_SENSORS]={0, 0},x=0,y=0,z=0;
 bool temp_status[NUM_TEMP_SENSORS]={false, false};
