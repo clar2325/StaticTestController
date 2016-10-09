@@ -134,9 +134,9 @@ void loop() {
 
   BEGIN_SEND
   SEND_ITEM(force, force_reading)
-  SEND_ITEM(x_acceleration, x)
-  SEND_ITEM(y_acceleration, y)
-  SEND_ITEM(z_acceleration, z)
+  SEND_ITEM(acceleration, x)
+  SEND_GROUP_ITEM(y)
+  SEND_GROUP_ITEM(z)
   switch (i) {
     case 0:
       SEND_ITEM(inlet_temperature,  temp[0])
