@@ -1,6 +1,6 @@
 
 #define COUNTDOWN_DURATION 60000
-#define SAFETY_TIME -10000
+//#define SAFETY_TIME -10000
 #define START_TIME  0
 #define RUN_TIME  30000
 #define COOLDOWN_TIME 60000 * 5
@@ -9,7 +9,6 @@
 enum state {
   MANUAL_CONTROL,
   TERMINAL_COUNT,
-  ENGINE_READY,
   ENGINE_RUNNING,
   COOL_DOWN
 };
@@ -36,17 +35,10 @@ void abort_autosequence() {
     case TERMINAL_COUNT:
       SET_STATE(MANUAL_CONTROL)
       break;
-    case ENGINE_READY:
-      fuel_safety(false);
-      oxy_safety(false);
-      SET_STATE(MANUAL_CONTROL)
-      break;
     case ENGINE_RUNNING:
       SET_STATE(COOL_DOWN)
       fuel_throttle(0);
       oxy_throttle(0);
-      fuel_safety(false);
-      oxy_safety(false);
       shutdown_time = millis();
       break;
     // etc, TODO
@@ -63,14 +55,6 @@ void run_control() {
     // TODO: There should be a lot more here, also checking if things went wrong
     switch (state) {
       case TERMINAL_COUNT:
-        if (run_time >= SAFETY_TIME) {
-          SET_STATE(ENGINE_READY)
-          fuel_safety(true);
-          oxy_safety(true);
-        }
-        break;
-        
-      case ENGINE_READY:
         if (run_time >= START_TIME) {
           SET_STATE(ENGINE_RUNNING)
           fuel_throttle(10);
@@ -84,8 +68,6 @@ void run_control() {
           SET_STATE(COOL_DOWN)
           fuel_throttle(0);
           oxy_throttle(0);
-          fuel_safety(false);
-          oxy_safety(false);
           shutdown_time = millis();
         }
         break;
@@ -99,6 +81,8 @@ void run_control() {
         break;
     }
   }
+
+  update_throttle();
 }
 
 void run_manual_control() {

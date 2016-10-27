@@ -1,32 +1,30 @@
-// TODO: fill these in
-void fuel_safety(bool open) {
-  if (open)
-    Serial.println("Opening fuel safety valve");
-  else
-    Serial.println("Closing fuel safety valve");
-    
-  SEND(fuel_safety, open);
-}
+int fuel_target;
+int oxy_target;
 
-void oxy_safety(bool open) {
-  if (open)
-    Serial.println("Opening oxygen safety valve");
-  else
-    Serial.println("Closing oxygen safety valve");
-  SEND(oxy_safety, open);
-}
-
-// TODO send read settings instead of set points
 void fuel_throttle(int setting) {
   Serial.print("Fuel control valve at ");
   Serial.println(setting);
-  SEND(fuel_control, setting); 
+  SEND(fuel_target, setting);
+  fuel_target = setting;
 }
 
 void oxy_throttle(int setting) {
   Serial.print("Oxygen control valve at ");
   Serial.println(setting);
-  SEND(oxy_control, setting);
+  SEND(oxy_target, setting);
+  oxy_target = setting;
+}
+
+// TODO
+void update_throttle() {
+  // TODO: Read fuel and oxygen valve settings from potentiometers
+  int fuel_setting;
+  int oxy_setting;
+  
+  SEND(fuel_setting, fuel_setting);
+  SEND(oxy_setting, oxy_setting);
+
+  // TODO: write to relays to control throttle valves
 }
 
 void fire_ignitor() {
