@@ -30,4 +30,3 @@ void update_throttle() {
 void fire_ignitor() {
   Serial.println("Firing ignitor");
 }
-

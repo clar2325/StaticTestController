@@ -47,10 +47,13 @@ char data_name[20] = "";
 // Logging
 //char filename[] = "DATA000.csv";
 
+//I commented the setup and loop functions so that I could made separate ones without all the hardware implementations
+//They will be uncommented and tested after making sure the state machine is working correctly
+/*
 void setup() {
-  //------------- set up temp sensor-----------
   Serial.begin(230400);
   Serial.println("Initializing...");
+  //------------- set up temp sensor-----------
   sensors.begin();
 
   for (int i = 0; i < NUM_TEMP_SENSORS; i++) {
@@ -75,7 +78,7 @@ void setup() {
   //-------------set up accelerometer---------------
   if (!mma.begin()) {
     Serial.println("Acc error");
-    //while (1); // Commented out for testing purpouses
+    while (1); // Commented out for testing purpouses
   }
   
   mma.setRange(MMA8451_RANGE_2_G);  // set acc range (2 5 8)
@@ -118,16 +121,16 @@ void loop() {
     // Send the command to get temperatures for the next loop
     sensors.requestTemperatures();
   
-  /* ---Get a new sensor event */ 
+  // ---Get a new sensor event 
   sensors_event_t event;
   mma.getEvent(&event);
 
-  /*---------- Display the results (acceleration is measured in m/s^2) */ 
+  //---------- Display the results (acceleration is measured in m/s^2)
   
   x=event.acceleration.x;  y=event.acceleration.y;  z=event.acceleration.z;
   //storeData(force_reading, tempc, x, y, z);
 
-  /* Run autonoumous control */
+  // Run autonoumous control
   // Get a throttle setting, throttle the engine
   
   run_control();
@@ -162,7 +165,7 @@ void loop() {
     }
   }
   READ_FLAG(start) {
-    start_autosequence();
+    start_countdown();
   }
   READ_FLAG(stop) {
     abort_autosequence();
@@ -176,4 +179,4 @@ void loop() {
   END_READ
   
 //  delay(10);
-}
+}*/
