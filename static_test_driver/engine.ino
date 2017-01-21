@@ -1,5 +1,5 @@
-int fuel_target;
-int oxy_target;
+int fuel_target = 0;
+int oxy_target = 0;
 
 void fuel_throttle(int setting) {
   Serial.print("Fuel control valve at ");
@@ -18,8 +18,8 @@ void oxy_throttle(int setting) {
 // TODO
 void update_throttle() {
   // TODO: Read fuel and oxygen valve settings from potentiometers
-  int fuel_setting;
-  int oxy_setting;
+  int fuel_setting = 0;
+  int oxy_setting = 0;
   
   SEND(fuel_setting, fuel_setting);
   SEND(oxy_setting, oxy_setting);
@@ -30,4 +30,3 @@ void update_throttle() {
 void fire_ignitor() {
   Serial.println("Firing ignitor");
 }
-
