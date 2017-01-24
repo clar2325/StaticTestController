@@ -1,9 +1,10 @@
-#include "Adafruit_MAX31855.h"
+
 #include <SPI.h>
 //#include <SD.h>
 #include <Wire.h>
 //#include "RTClib.h"
 #include <Adafruit_MMA8451.h>
+#include <Adafruit_MAX31855.h>
 #include <Adafruit_Sensor.h>
 #include <Telemetry.h>
 
