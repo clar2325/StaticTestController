@@ -10,14 +10,26 @@
 
 Adafruit_MMA8451 mma = Adafruit_MMA8451();
 const int chipSelect=10;                            // Use digital pin 10 as the slave select pin (SPI bus).
-float temp,pressure,x,y,z;
+float chamber_temp, inlet_temp, outlet_temp,pressure,x,y,z;
 bool temp_status = false;
+#define PROTOTYPE_SENSORS
 
 //Thermocouple pins
-#define MAXDO   3
-#define MAXCS   4
-#define MAXCLK  5
-Adafruit_MAX31855 thermocouple(MAXCLK, MAXCS, MAXDO);
+#define MAXDO1   3
+#define MAXCS1   4
+#define MAXCLK1  5
+Adafruit_MAX31855 Chamber_Thermocouple(MAXCLK1, MAXCS1, MAXDO1);
+
+#ifndef PROTOTYPE_SENSORS
+#define MAXDO2   6
+#define MAXCS2   7
+#define MAXCLK2  8
+#define MAXDO3   9
+#define MAXCS3   10
+#define MAXCLK3  11
+Adafruit_MAX31855 Inlet_Thermocouple(MAXCLK2, MAXCS2, MAXDO2);
+Adafruit_MAX31855 Outlet_Thermocouple(MAXCLK3, MAXCS3, MAXDO3);
+#endif
 
 //Pressure Setup
 #define PRESSURE_CALIBRATION_FACTOR 246.58
@@ -77,8 +89,8 @@ void setup()
   Serial.println("Initializing...");
   // wait for MAX chip to stabilize
   delay(500);
-  //--------------------Set up thermocouple--------------------
-  temp = thermocouple.readCelsius();
+  //--------------------Set up 3 thermocouples--------------------
+  temp = Chamber_Thermocouple.readCelsius();
   if (isnan(temp)){
     Serial.println("Temp sensor err");
     temp_status = false;
@@ -87,6 +99,26 @@ void setup()
     Serial.println("Temp sensor connected");
     temp_status = true;
   }
+  #ifndef PROTOTYPE_SENSORS
+  temp = Inlet_Thermocouple.readCelsius();
+  if (isnan(temp)){
+    Serial.println("Temp sensor err");
+    temp_status = false;
+  } 
+  else {
+    Serial.println("Temp sensor connected");
+    temp_status = true;
+  }
+  temp = Outlet_Thermocouple.readCelsius();
+  if (isnan(temp)){
+    Serial.println("Temp sensor err");
+    temp_status = false;
+  } 
+  else {
+    Serial.println("Temp sensor connected");
+    temp_status = true;
+  }
+  #endif
   //-------------------Set up pressure sensors--------------------
   pinMode (PRESSURE_PIN,INPUT);
   unsigned long loops = 0;
@@ -115,8 +147,8 @@ void loop() {
 
   // Temp sensors are slow, so alternate taking data from each sensor each loop
   // Why "byIndex"? You can have more than one IC on the same bus. 
-  temp = thermocouple.readCelsius();
-  if (isnan(temp)){
+  chamber_temp = Chamber_Thermocouple.readCelsius();
+  if (isnan(chamber_temp)){
     Serial.println("Temp sensor err");
     temp_status = false;
   } 
@@ -124,7 +156,26 @@ void loop() {
     Serial.println("Temp sensor connected");
     temp_status = true;
   }
-
+  #ifndef PROTOTYPE_SENSORS
+  inlet_temp = Inlet_Thermocouple.readCelsius();
+  if (isnan(inlet_temp)){
+    Serial.println("Temp sensor err");
+    temp_status = false;
+  } 
+  else {
+    Serial.println("Temp sensor connected");
+    temp_status = true;
+  }
+  outlet_temp = Outlet_Thermocouple.readCelsius();
+  if (isnan(outlet_temp)){
+    Serial.println("Temp sensor err");
+    temp_status = false;
+  } 
+  else {
+    Serial.println("Temp sensor connected");
+    temp_status = true;
+  }
+  #endif
   //---------- Display the results (acceleration is measured in m/s^2)
   
   //x=event.acceleration.x;  y=event.acceleration.y;  z=event.acceleration.z;
@@ -141,7 +192,11 @@ void loop() {
   //SEND_ITEM(acceleration, x)
   //SEND_GROUP_ITEM(y)
   //SEND_GROUP_ITEM(z)
-  SEND_ITEM(outlet_temperature, temp)
+  #ifndef PROTOTYPE SENSORS  
+  SEND_ITEM(outlet_temperature, outlet_temp)
+  SEND_ITEM(inlet_temperature, inlet_temp)
+  #endif
+  SEND_ITEM(chamber_temperature, chamber_temp)
   END_SEND
 
   BEGIN_READ
