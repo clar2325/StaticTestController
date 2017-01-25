@@ -2,6 +2,7 @@
 #include <SPI.h>
 //#include <SD.h>
 #include <Wire.h>
+#include "HX711.h"
 //#include "RTClib.h"
 #include <Adafruit_MMA8451.h>
 #include <Adafruit_MAX31855.h>
@@ -36,6 +37,11 @@ Adafruit_MAX31855 Outlet_Thermocouple(MAXCLK3, MAXCS3, MAXDO3);
 #define PRESSURE_OFFSET 118.33
 #define PRESSURE_PIN 1
 
+//Force Setup
+#define calibration_factor 20400.0 //This value is obtained using the SparkFun_HX711_Calibration sketch
+#define DOUT  12
+#define CLK  13
+HX711 scale(DOUT, CLK);
 
 #define HIGH_RANGE
 
@@ -119,8 +125,11 @@ void setup()
     temp_status = true;
   }
   #endif
-  //-------------------Set up pressure sensors--------------------
+  //-------------------Set up pressure sensor--------------------
   pinMode (PRESSURE_PIN,INPUT);
+  //-------------------Set up force sensor-------------------
+  scale.set_scale(calibration_factor); //This value is obtained by using the SparkFun_HX711_Calibration sketch
+  scale.tare();  //Assuming there is no weight on the scale at start up, reset the scale to 0
   unsigned long loops = 0;
 }
 
@@ -128,9 +137,7 @@ void setup()
 void loop() {
 
   //--------------Grab Force Data----------------------
-  float count = analogRead(A0);
-  float voltage = count / 1023 * 5.0;// convert from count to raw voltage
-  float force_reading = intercept + voltage * slope; //converts voltage to sensor reading
+  force_reading = scale.get_units();
 
   prev_vals[val_num] = force_reading;
   val_num++;
@@ -207,7 +214,6 @@ void loop() {
       for (int i = 0; i < NUM_HIST_VALS; i++)
         zero_val += prev_vals[i];
       zero_val /= NUM_HIST_VALS;
-      intercept -= force_reading;
     }
     else {
       Serial.println("Zero err");
