@@ -1,8 +1,11 @@
+#define DEMO 0
+#define MK_1 1
+#define MK_2 2
 
 #include <SPI.h>
 //#include <SD.h>
 #include <Wire.h>
-#include "HX711.h"
+#include <HX711.h>
 //#include "RTClib.h"
 #include <Adafruit_MMA8451.h>
 #include <Adafruit_MAX31855.h>
@@ -13,53 +16,42 @@ Adafruit_MMA8451 mma = Adafruit_MMA8451();
 const int chipSelect=10;                            // Use digital pin 10 as the slave select pin (SPI bus).
 float chamber_temp, inlet_temp, outlet_temp,pressure,x,y,z;
 bool temp_status = false;
-#define PROTOTYPE_SENSORS
+#define CONFIGURATION DEMO
 
 //Thermocouple pins
+#if CONFIGURATION == MK_1
 #define MAXDO1   3
 #define MAXCS1   4
 #define MAXCLK1  5
 Adafruit_MAX31855 Chamber_Thermocouple(MAXCLK1, MAXCS1, MAXDO1);
+#endif
 
-#ifndef PROTOTYPE_SENSORS
 #define MAXDO2   6
 #define MAXCS2   7
 #define MAXCLK2  8
 #define MAXDO3   9
-#define MAXCS3   10
-#define MAXCLK3  11
+#define MAXCS3   11
+#define MAXCLK3  12
 Adafruit_MAX31855 Inlet_Thermocouple(MAXCLK2, MAXCS2, MAXDO2);
 Adafruit_MAX31855 Outlet_Thermocouple(MAXCLK3, MAXCS3, MAXDO3);
-#endif
+
 
 //Pressure Setup
 #define PRESSURE_CALIBRATION_FACTOR 246.58
 #define PRESSURE_OFFSET 118.33
 #define PRESSURE_PIN 1
 
-//Force Setup
+//-------------------Set up force sensor-------------------
 #define calibration_factor 20400.0 //This value is obtained using the SparkFun_HX711_Calibration sketch
-#define DOUT  12
-#define CLK  13
+#define DOUT  13
+#define CLK  14
 HX711 scale(DOUT, CLK);
+scale.set_scale(calibration_factor); //This value is obtained by using the SparkFun_HX711_Calibration sketch
+scale.tare();  //Assuming there is no weight on the scale at start up, reset the scale to 0
 
-#define HIGH_RANGE
-
-#ifdef HIGH_RANGE
-float intercept = -250;
-float slope = 250;
-#else
-float intercept = -1000;
-float slope = 1000;
-#endif
 int TimeBetweenReadings = 500; // in ms
 int ReadingNumber=0;
 
-#define NUM_HIST_VALS 10
-
-float prev_vals[NUM_HIST_VALS];
-int val_num = 0;
-bool zero_ready = false;
 
 char data[10] = "";
 char data_name[20] = "";
@@ -96,40 +88,38 @@ void setup()
   // wait for MAX chip to stabilize
   delay(500);
   //--------------------Set up 3 thermocouples--------------------
-  temp = Chamber_Thermocouple.readCelsius();
-  if (isnan(temp)){
-    Serial.println("Temp sensor err");
+  #if CONFIGURATION == MK_1
+  chamber_temp = Chamber_Thermocouple.readCelsius();
+  if (isnan(chamber_temp)){
+    Serial.println("Chamber Temp sensor err");
     temp_status = false;
   } 
   else {
-    Serial.println("Temp sensor connected");
-    temp_status = true;
-  }
-  #ifndef PROTOTYPE_SENSORS
-  temp = Inlet_Thermocouple.readCelsius();
-  if (isnan(temp)){
-    Serial.println("Temp sensor err");
-    temp_status = false;
-  } 
-  else {
-    Serial.println("Temp sensor connected");
-    temp_status = true;
-  }
-  temp = Outlet_Thermocouple.readCelsius();
-  if (isnan(temp)){
-    Serial.println("Temp sensor err");
-    temp_status = false;
-  } 
-  else {
-    Serial.println("Temp sensor connected");
+    Serial.println("Chamber Temp sensor connected");
     temp_status = true;
   }
   #endif
+  inlet_temp = Inlet_Thermocouple.readCelsius();
+  if (isnan(inlet_temp)){
+    Serial.println("Inlet Temp sensor err");
+    temp_status = false;
+  } 
+  else {
+    Serial.println("Inlet Temp sensor connected");
+    temp_status = true;
+  }
+  outlet_temp = Outlet_Thermocouple.readCelsius();
+  if (isnan(outlet_temp)){
+    Serial.println("Outlet Temp sensor err");
+    temp_status = false;
+  } 
+  else {
+    Serial.println("Outlet Temp sensor connected");
+    temp_status = true;
+  }
   //-------------------Set up pressure sensor--------------------
   pinMode (PRESSURE_PIN,INPUT);
-  //-------------------Set up force sensor-------------------
-  scale.set_scale(calibration_factor); //This value is obtained by using the SparkFun_HX711_Calibration sketch
-  scale.tare();  //Assuming there is no weight on the scale at start up, reset the scale to 0
+
   unsigned long loops = 0;
 }
 
@@ -137,23 +127,14 @@ void setup()
 void loop() {
 
   //--------------Grab Force Data----------------------
-  force_reading = scale.get_units();
-
-  prev_vals[val_num] = force_reading;
-  val_num++;
-  if (val_num >= NUM_HIST_VALS) {
-    val_num = 0;
-    zero_ready = true;
-  }
-
+  force_reading = scale.get_units(); //Force is measured in lbs
   //---------------Grab Pressure Data-------------------
-  pressure = (analogRead (PRESSURE_PIN)* 5/ 1024.) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET;
-  
-
+  pressure = (analogRead (PRESSURE_PIN)* 5/ 1024.) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET; //Pressure is measured in PSIG
   // --------------Grab Tempdata------------------------ 
 
   // Temp sensors are slow, so alternate taking data from each sensor each loop
   // Why "byIndex"? You can have more than one IC on the same bus. 
+  #if CONFIGURATION == MK_1
   chamber_temp = Chamber_Thermocouple.readCelsius();
   if (isnan(chamber_temp)){
     Serial.println("Temp sensor err");
@@ -163,7 +144,7 @@ void loop() {
     Serial.println("Temp sensor connected");
     temp_status = true;
   }
-  #ifndef PROTOTYPE_SENSORS
+  #endif
   inlet_temp = Inlet_Thermocouple.readCelsius();
   if (isnan(inlet_temp)){
     Serial.println("Temp sensor err");
@@ -182,7 +163,6 @@ void loop() {
     Serial.println("Temp sensor connected");
     temp_status = true;
   }
-  #endif
   //---------- Display the results (acceleration is measured in m/s^2)
   
   //x=event.acceleration.x;  y=event.acceleration.y;  z=event.acceleration.z;
@@ -199,26 +179,14 @@ void loop() {
   //SEND_ITEM(acceleration, x)
   //SEND_GROUP_ITEM(y)
   //SEND_GROUP_ITEM(z)
-  #ifndef PROTOTYPE SENSORS  
   SEND_ITEM(outlet_temperature, outlet_temp)
   SEND_ITEM(inlet_temperature, inlet_temp)
-  #endif
+  #if CONFIGURATION == MK_1 
   SEND_ITEM(chamber_temperature, chamber_temp)
+  #endif
   END_SEND
 
   BEGIN_READ
-  READ_FLAG(zero) {
-    if (zero_ready) {
-      Serial.println("Zeroing");
-      float zero_val = 0;
-      for (int i = 0; i < NUM_HIST_VALS; i++)
-        zero_val += prev_vals[i];
-      zero_val /= NUM_HIST_VALS;
-    }
-    else {
-      Serial.println("Zero err");
-    }
-  }
   READ_FLAG(start) {
     start_countdown();
   }
