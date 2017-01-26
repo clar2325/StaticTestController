@@ -18,7 +18,7 @@ float chamber_temp, inlet_temp, outlet_temp,pressure,x,y,z;
 bool temp_status = false;
 #define CONFIGURATION DEMO
 
-//Thermocouple pins
+//Thermocouple Setup
 #if CONFIGURATION == MK_1
 #define MAXDO1   3
 #define MAXCS1   4
@@ -41,13 +41,11 @@ Adafruit_MAX31855 Outlet_Thermocouple(MAXCLK3, MAXCS3, MAXDO3);
 #define PRESSURE_OFFSET 118.33
 #define PRESSURE_PIN 1
 
-//-------------------Set up force sensor-------------------
+//Force Setup
 #define calibration_factor 20400.0 //This value is obtained using the SparkFun_HX711_Calibration sketch
 #define DOUT  13
 #define CLK  14
 HX711 scale(DOUT, CLK);
-scale.set_scale(calibration_factor); //This value is obtained by using the SparkFun_HX711_Calibration sketch
-scale.tare();  //Assuming there is no weight on the scale at start up, reset the scale to 0
 
 int TimeBetweenReadings = 500; // in ms
 int ReadingNumber=0;
@@ -119,6 +117,8 @@ void setup()
   }
   //-------------------Set up pressure sensor--------------------
   pinMode (PRESSURE_PIN,INPUT);
+  //Calibrate load cell
+  scale.set_scale(calibration_factor); //This value is obtained by using the SparkFun_HX711_Calibration sketch
 
   unsigned long loops = 0;
 }
@@ -131,9 +131,6 @@ void loop() {
   //---------------Grab Pressure Data-------------------
   pressure = (analogRead (PRESSURE_PIN)* 5/ 1024.) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET; //Pressure is measured in PSIG
   // --------------Grab Tempdata------------------------ 
-
-  // Temp sensors are slow, so alternate taking data from each sensor each loop
-  // Why "byIndex"? You can have more than one IC on the same bus. 
   #if CONFIGURATION == MK_1
   chamber_temp = Chamber_Thermocouple.readCelsius();
   if (isnan(chamber_temp)){
