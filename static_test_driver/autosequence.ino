@@ -32,8 +32,6 @@ enum state state = START_UP;
 //changed start_autosequence to start_countdown which is called in the standby state
 void start_countdown() {
   Serial.println("Countdown started");
-  
-  scale.tare(); //Load Cell, Assuming there is no weight on the scale at start up, reset the scale to 0
   SET_STATE(TERMINAL_COUNT)
   start_time = millis();
 }
