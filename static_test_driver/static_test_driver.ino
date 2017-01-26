@@ -18,13 +18,12 @@ float chamber_temp, inlet_temp, outlet_temp,pressure,x,y,z;
 bool temp_status = false;
 #define CONFIGURATION DEMO
 
-
+//Thermocouple and pressure setup for MK_2
 #if CONFIGURATION == MK_2
 #define MAXDO1   3
 #define MAXCS1   4
 #define MAXCLK1  5
 Adafruit_MAX31855 Chamber_Thermocouple(MAXCLK1, MAXCS1, MAXDO1);
-//Pressure Setup
 #define PRESSURE_CALIBRATION_FACTOR 246.58
 #define PRESSURE_OFFSET 118.33
 #define PRESSURE_PIN 1
@@ -84,7 +83,7 @@ void setup()
   Serial.println("Initializing...");
   // wait for MAX chip to stabilize
   delay(500);
-  //--------------------Set up 3 thermocouples--------------------
+  //--------------------Set up thermocouple and pressure sensor for MK_2--------------------
   #if CONFIGURATION == MK_2
   chamber_temp = Chamber_Thermocouple.readCelsius();
   if (isnan(chamber_temp)){
@@ -95,9 +94,10 @@ void setup()
     Serial.println("Chamber Temp sensor connected");
     temp_status = true;
   }
-  //-------------------Set up pressure sensor--------------------
   pinMode (PRESSURE_PIN,INPUT);
   #endif
+  
+  //------------------Set up thermocouples-------------------------------
   inlet_temp = Inlet_Thermocouple.readCelsius();
   if (isnan(inlet_temp)){
     Serial.println("Inlet Temp sensor err");
@@ -128,6 +128,7 @@ void loop() {
   //--------------Grab Force Data----------------------
   force_reading = scale.get_units(); //Force is measured in lbs
   
+  //--------------Grab Temp Data for MK_2
   #if CONFIGURATION == MK_2
   chamber_temp = Chamber_Thermocouple.readCelsius();
   if (isnan(chamber_temp)){
