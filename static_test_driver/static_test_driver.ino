@@ -19,7 +19,7 @@ bool temp_status = false;
 #define CONFIGURATION DEMO
 
 //Thermocouple Setup
-#if CONFIGURATION == MK_1
+#if CONFIGURATION == MK_2
 #define MAXDO1   3
 #define MAXCS1   4
 #define MAXCLK1  5
@@ -86,7 +86,7 @@ void setup()
   // wait for MAX chip to stabilize
   delay(500);
   //--------------------Set up 3 thermocouples--------------------
-  #if CONFIGURATION == MK_1
+  #if CONFIGURATION == MK_2
   chamber_temp = Chamber_Thermocouple.readCelsius();
   if (isnan(chamber_temp)){
     Serial.println("Chamber Temp sensor err");
@@ -131,7 +131,7 @@ void loop() {
   //---------------Grab Pressure Data-------------------
   pressure = (analogRead (PRESSURE_PIN)* 5/ 1024.) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET; //Pressure is measured in PSIG
   // --------------Grab Tempdata------------------------ 
-  #if CONFIGURATION == MK_1
+  #if CONFIGURATION == MK_2
   chamber_temp = Chamber_Thermocouple.readCelsius();
   if (isnan(chamber_temp)){
     Serial.println("Temp sensor err");
@@ -178,7 +178,7 @@ void loop() {
   //SEND_GROUP_ITEM(z)
   SEND_ITEM(outlet_temperature, outlet_temp)
   SEND_ITEM(inlet_temperature, inlet_temp)
-  #if CONFIGURATION == MK_1 
+  #if CONFIGURATION == MK_2
   SEND_ITEM(chamber_temperature, chamber_temp)
   #endif
   END_SEND
