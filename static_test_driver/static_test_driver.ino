@@ -187,7 +187,7 @@ void loop() {
 
   BEGIN_READ
   READ_FLAG(zero) {
-  scale.tare(); //Load Cell, Assuming there is no weight on the scale at start up, reset the scale to 0
+    scale.tare(); //Load Cell, Assuming there is no weight on the scale at start up, reset the scale to 0
   }
   READ_FLAG(start) {
     start_countdown();
