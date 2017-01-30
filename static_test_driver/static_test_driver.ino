@@ -175,7 +175,6 @@ void loop() {
   }
   //----------Grab Acc Data (acceleration is measured in m/s^2)
   x=event.acceleration.x;  y=event.acceleration.y;  z=event.acceleration.z;
-  storeData(force_reading, tempc, x, y, z);
 
   // Run autonoumous control
   // Get a throttle setting, throttle the engine
