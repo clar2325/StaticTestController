@@ -118,6 +118,17 @@ void setup()
   }
   //Calibrate load cell
   scale.set_scale(calibration_factor); //This value is obtained by using the SparkFun_HX711_Calibration sketch
+  
+   //-------------set up accelerometer---------------
+  if (!mma.begin()) {
+    Serial.println("Acc error");
+    while(1){}
+  }
+  mma.setRange(MMA8451_RANGE_2_G);  // set acc range (2 5 8)
+  Serial.print("Acc range "); 
+  Serial.print(2 << mma.getRange()); 
+  Serial.println("G");
+  Wire.begin();
 
   unsigned long loops = 0;
 }
@@ -162,10 +173,9 @@ void loop() {
     Serial.println("Temp sensor connected");
     temp_status = true;
   }
-  //---------- Display the results (acceleration is measured in m/s^2)
-  
-  //x=event.acceleration.x;  y=event.acceleration.y;  z=event.acceleration.z;
-  //storeData(force_reading, tempc, x, y, z);
+  //----------Grab Acc Data (acceleration is measured in m/s^2)
+  x=event.acceleration.x;  y=event.acceleration.y;  z=event.acceleration.z;
+  storeData(force_reading, tempc, x, y, z);
 
   // Run autonoumous control
   // Get a throttle setting, throttle the engine
@@ -174,9 +184,9 @@ void loop() {
 
   BEGIN_SEND
   SEND_ITEM(force, force_reading)
-  //SEND_ITEM(acceleration, x)
-  //SEND_GROUP_ITEM(y)
-  //SEND_GROUP_ITEM(z)
+  SEND_ITEM(acceleration, x)
+  SEND_GROUP_ITEM(y)
+  SEND_GROUP_ITEM(z)
   SEND_ITEM(outlet_temperature, outlet_temp)
   SEND_ITEM(inlet_temperature, inlet_temp)
   #if CONFIGURATION == MK_2
