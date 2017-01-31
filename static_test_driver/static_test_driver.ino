@@ -2,19 +2,21 @@
 #define MK_1 1
 #define MK_2 2
 
+#define CONFIGURATION DEMO
+
 #include <SPI.h>
 #include <Wire.h>
-#include <HX711.h>
+#include <HX711.h> // https://github.com/bogde/HX711
 #include <Adafruit_MMA8451.h>
 #include <Adafruit_MAX31855.h>
 #include <Adafruit_Sensor.h>
 #include <Telemetry.h>
+#include <avr/pgmspace.h>
 
 Adafruit_MMA8451 mma = Adafruit_MMA8451();
 const int chipSelect=10;                            // Use digital pin 10 as the slave select pin (SPI bus).
-float chamber_temp, inlet_temp, outlet_temp,pressure,x,y,z;
-bool temp_status = false;
-#define CONFIGURATION DEMO
+float chamber_temp, inlet_temp, outlet_temp,pressure, x,y,z;
+bool sensor_status = true;
 
 //Thermocouple and pressure setup for MK_2
 #if CONFIGURATION == MK_2
@@ -52,59 +54,59 @@ char data_name[20] = "";
 void setup() {
   while (!Serial);
   Serial.begin(230400);
-  Serial.println("Initializing...");
+  Serial.println(F("Initializing..."));
   // wait for MAX chip to stabilize
   delay(500);
   //--------------------Set up thermocouple and pressure sensor for MK_2--------------------
   #if CONFIGURATION == MK_2
   chamber_temp = Chamber_Thermocouple.readCelsius();
-  if (isnan(chamber_temp)){
-    Serial.println("Chamber Temp sensor err");
-    temp_status = false;
-  } 
-  else {
-    Serial.println("Chamber Temp sensor connected");
-    temp_status = true;
+  if (isnan(chamber_temp)) {
+    Serial.println(F("Chamber Temp sensor err"));
+    sensor_status = false;
   }
-  pinMode (PRESSURE_PIN,INPUT);
+  else {
+    Serial.println(F("Chamber Temp sensor connected"));
+  }
+  pinMode(PRESSURE_PIN, INPUT);
   #endif
   
   //------------------Set up thermocouples-------------------------------
   inlet_temp = Inlet_Thermocouple.readCelsius();
-  if (isnan(inlet_temp)){
-    Serial.println("Inlet Temp sensor err");
-    temp_status = false;
+  if (isnan(inlet_temp)) {
+    Serial.println(F("Inlet Temp sensor err"));
+    sensor_status = false;
   } 
   else {
-    Serial.println("Inlet Temp sensor connected");
-    temp_status = true;
+    Serial.println(F("Inlet Temp sensor connected"));
   }
   outlet_temp = Outlet_Thermocouple.readCelsius();
-  if (isnan(outlet_temp)){
-    Serial.println("Outlet Temp sensor err");
-    temp_status = false;
-  } 
+  if (isnan(outlet_temp)) {
+    Serial.println(F("Outlet Temp sensor err"));
+    sensor_status = false;
+  }
   else {
-    Serial.println("Outlet Temp sensor connected");
-    temp_status = true;
+    Serial.println(F("Outlet Temp sensor connected"));
   }
   //Calibrate load cell
   scale.set_scale(calibration_factor); //This value is obtained by using the SparkFun_HX711_Calibration sketch
   
    //-------------set up accelerometer---------------
   if (!mma.begin()) {
-    Serial.println("Acc error");
-    while(1){}
+    Serial.println(F("Accelerometer error"));
+    sensor_status = false;
   }
+  
   mma.setRange(MMA8451_RANGE_2_G);  // set acc range (2 5 8)
-  Serial.print("Acc range "); 
+  Serial.print(F("Accelerometer range ")); 
   Serial.print(2 << mma.getRange()); 
   Serial.println("G");
+  
   Wire.begin();
 
-  unsigned long loops = 0;
+  // Halt in an infinite loop if initialization failed
+  if (!sensor_status)
+    abort();
 }
-
 
 void loop() {
 
@@ -114,13 +116,9 @@ void loop() {
   //--------------Grab Temp Data for MK_2
   #if CONFIGURATION == MK_2
   chamber_temp = Chamber_Thermocouple.readCelsius();
-  if (isnan(chamber_temp)){
-    Serial.println("Temp sensor err");
-    temp_status = false;
-  } 
-  else {
-    Serial.println("Temp sensor connected");
-    temp_status = true;
+  if (isnan(chamber_temp)) {
+    Serial.println(F("Chamber Temp sensor err"));
+    sensor_status = false;
   }
   //---------------Grab Pressure Data-------------------
   pressure = (analogRead (PRESSURE_PIN)* 5/ 1024.) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET; //Pressure is measured in PSIG
@@ -128,22 +126,14 @@ void loop() {
   
   // --------------Grab Tempdata------------------------ 
   inlet_temp = Inlet_Thermocouple.readCelsius();
-  if (isnan(inlet_temp)){
-    Serial.println("Temp sensor err");
-    temp_status = false;
-  } 
-  else {
-    Serial.println("Temp sensor connected");
-    temp_status = true;
+  if (isnan(inlet_temp)) {
+    Serial.println(F("Inlet Temp sensor err"));
+    sensor_status = false;
   }
   outlet_temp = Outlet_Thermocouple.readCelsius();
-  if (isnan(outlet_temp)){
-    Serial.println("Temp sensor err");
-    temp_status = false;
-  } 
-  else {
-    Serial.println("Temp sensor connected");
-    temp_status = true;
+  if (isnan(outlet_temp)) {
+    Serial.println(F("Outlet Temp sensor err"));
+    sensor_status = false;
   }
   
   //----------Grab Acc Data (acceleration is measured in m/s^2)
@@ -152,8 +142,6 @@ void loop() {
   x=event.acceleration.x;  y=event.acceleration.y;  z=event.acceleration.z;
 
   // Run autonoumous control
-  // Get a throttle setting, throttle the engine
-  
   run_control();
 
   BEGIN_SEND
@@ -167,8 +155,11 @@ void loop() {
   SEND_ITEM(chamber_temperature, chamber_temp)
   SEND_ITEM(pressure,pressure)
   #endif
+  SEND_ITEM(sensor_status, sensor_status)
   END_SEND
-
+  
+  int fuel_command, oxy_command;
+  
   BEGIN_READ
   READ_FLAG(zero) {
     scale.tare(); //Load Cell, Assuming there is no weight on the scale at start up, reset the scale to 0
@@ -179,13 +170,20 @@ void loop() {
   READ_FLAG(stop) {
     abort_autosequence();
   }
+  READ_FLAG(stop) {
+    abort_autosequence();
+  }
+  READ_FIELD(fuel_command, "%d") {
+    fuel_throttle(fuel_command);
+  }
+  READ_FIELD(oxy_command, "%d") {
+    oxy_throttle(oxy_command);
+  }
   READ_DEFAULT(data_name, data) {
-    Serial.print("Invalid: ");
+    Serial.print(F("Invalid data field recieved: "));
     Serial.print(data_name);
     Serial.print(":");
     Serial.println(data);
   }
   END_READ
-
-//  delay(10);
 }
