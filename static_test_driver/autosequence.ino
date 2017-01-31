@@ -97,7 +97,7 @@ void run_control() {
     //this case might be entirely unessesary but I added it just in case we might want it
       SET_STATE(ENGINE_RUNNING)
     case ENGINE_RUNNING:
-      if (temp >= 60) //checking outlet temperature to see if it reaches a certain level
+      if (outlet_temp >= 60) //checking outlet temperature to see if it reaches a certain level
       {
         Serial.println("Temperature Reached Critical level");
         abort_autosequence();

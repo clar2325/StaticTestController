@@ -3,10 +3,8 @@
 #define MK_2 2
 
 #include <SPI.h>
-//#include <SD.h>
 #include <Wire.h>
 #include <HX711.h>
-//#include "RTClib.h"
 #include <Adafruit_MMA8451.h>
 #include <Adafruit_MAX31855.h>
 #include <Adafruit_Sensor.h>
@@ -48,36 +46,10 @@ HX711 scale(DOUT, CLK);
 int TimeBetweenReadings = 500; // in ms
 int ReadingNumber=0;
 
-
 char data[10] = "";
 char data_name[20] = "";
 
-// Logging
-//char filename[] = "DATA000.csv";
-
-//I commented the setup and loop functions so that I could made separate ones without all the hardware implementations
-//They will be uncommented and tested after making sure the state machine is working correctly
-
-/*void setup() {
-  Serial.begin(230400);
-  Serial.println("Initializing...");
-  //------------- set up temp sensor-----------
-
-
-  //-------------set up accelerometer---------------
-  if (!mma.begin()) {
-    Serial.println("Acc error");
-    while(1){}
-  }
-  
-  mma.setRange(MMA8451_RANGE_2_G);  // set acc range (2 5 8)
-  Serial.print("Acc range "); Serial.print(2 << mma.getRange()); Serial.println("G");
-  
-  Wire.begin();
-}*/
-
-void setup()
-{
+void setup() {
   while (!Serial);
   Serial.begin(230400);
   Serial.println("Initializing...");
@@ -137,7 +109,7 @@ void setup()
 void loop() {
 
   //--------------Grab Force Data----------------------
-  force_reading = scale.get_units(); //Force is measured in lbs
+  float force_reading = scale.get_units(); //Force is measured in lbs
   
   //--------------Grab Temp Data for MK_2
   #if CONFIGURATION == MK_2
@@ -173,7 +145,10 @@ void loop() {
     Serial.println("Temp sensor connected");
     temp_status = true;
   }
+  
   //----------Grab Acc Data (acceleration is measured in m/s^2)
+  sensors_event_t event;
+  mma.getEvent(&event);
   x=event.acceleration.x;  y=event.acceleration.y;  z=event.acceleration.z;
 
   // Run autonoumous control
