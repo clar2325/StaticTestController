@@ -2,7 +2,12 @@
 #define MK_1 1
 #define MK_2 2
 
-#define CONFIGURATION DEMO
+// Change this line to set configuration
+#define CONFIGURATION MK_1
+
+#if !(CONFIGURATION == DEMO || CONFIGURATION == MK_1 || CONFIGURATION == MK_2)
+#error "Invalid configuration value"
+#endif
 
 #include <SPI.h>
 #include <Wire.h>
@@ -15,10 +20,10 @@
 
 Adafruit_MMA8451 mma = Adafruit_MMA8451();
 const int chipSelect=10;                            // Use digital pin 10 as the slave select pin (SPI bus).
-float chamber_temp, inlet_temp, outlet_temp,pressure, x,y,z;
+float chamber_temp, inlet_temp, outlet_temp, pressure, force, x,y,z;
 bool sensor_status = true;
 
-//Thermocouple and pressure setup for MK_2
+// Thermocouple and pressure setup for MK_2
 #if CONFIGURATION == MK_2
 #define MAXDO1   3
 #define MAXCS1   4
@@ -29,7 +34,7 @@ Adafruit_MAX31855 Chamber_Thermocouple(MAXCLK1, MAXCS1, MAXDO1);
 #define PRESSURE_PIN 1
 #endif
 
-//Thermocouple Setup
+// Thermocouple Setup
 #define MAXDO2   6
 #define MAXCS2   7
 #define MAXCLK2  8
@@ -39,14 +44,17 @@ Adafruit_MAX31855 Chamber_Thermocouple(MAXCLK1, MAXCS1, MAXDO1);
 Adafruit_MAX31855 Inlet_Thermocouple(MAXCLK2, MAXCS2, MAXDO2);
 Adafruit_MAX31855 Outlet_Thermocouple(MAXCLK3, MAXCS3, MAXDO3);
 
-//Force Setup
+// Force Setup
 #define calibration_factor 20400.0 //This value is obtained using the SparkFun_HX711_Calibration sketch
 #define DOUT  13
 #define CLK  14
 HX711 scale(DOUT, CLK);
 
-int TimeBetweenReadings = 500; // in ms
-int ReadingNumber=0;
+// Engine control setup
+int fuel_target = 0;
+int oxy_target = 0;
+int fuel_setting = 0;
+int oxy_setting = 0;
 
 char data[10] = "";
 char data_name[20] = "";
@@ -109,9 +117,8 @@ void setup() {
 }
 
 void loop() {
-
   //--------------Grab Force Data----------------------
-  float force_reading = scale.get_units(); //Force is measured in lbs
+  force = scale.get_units(); //Force is measured in lbs
   
   //--------------Grab Temp Data for MK_2
   #if CONFIGURATION == MK_2
@@ -145,7 +152,7 @@ void loop() {
   run_control();
 
   BEGIN_SEND
-  SEND_ITEM(force, force_reading)
+  SEND_ITEM(force, force)
   SEND_ITEM(acceleration, x)
   SEND_GROUP_ITEM(y)
   SEND_GROUP_ITEM(z)
@@ -164,11 +171,11 @@ void loop() {
   READ_FLAG(zero) {
     scale.tare(); //Load Cell, Assuming there is no weight on the scale at start up, reset the scale to 0
   }
+  READ_FLAG(reset) {
+    asm volatile ("  jmp 0"); // Perform a software reset of the board, reinitializing sensors
+  }
   READ_FLAG(start) {
     start_countdown();
-  }
-  READ_FLAG(stop) {
-    abort_autosequence();
   }
   READ_FLAG(stop) {
     abort_autosequence();

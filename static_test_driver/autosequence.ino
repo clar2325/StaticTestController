@@ -4,11 +4,16 @@
 #define RUN_TIME  30000
 #define COOLDOWN_TIME 60000 * 5 // 5 mins
 
-#define TEMP_CHECK_TIME 5000
-
 // Limits
+// Max outlet temperature before triggering a shutdown
 #define MAX_COOLANT_TEMP 60
-#define MIN_COOLANT_DELTA 8 // Min delta temp between inlet and outlet after TEMP_CHECK_TIME
+
+// Min thrust that must be reached to avoid triggering a no-ignition shutdown
+#if CONFIGURATION == DEMO || CONFIGURATION == MK_1
+#define MIN_THRUST 100
+#elif CONFIGURATION == MK_2
+#define MIN_THRUST 1000
+#endif
 
 enum state {
   STAND_BY,
@@ -78,13 +83,12 @@ void run_control() {
       }
       // Check that the coolant temperature has not exceeded the maximum limit
       else if (outlet_temp >= MAX_COOLANT_TEMP) {
-        Serial.println(F("Temperature Reached Critical level"));
+        Serial.println(F("Temperature reached critical level"));
         abort_autosequence();
       }
-      // looked at past tests and put in some rough parameters for ignition. The temperature would rise by approx 8 degrees celsius in the span of 2-3 seconds
-      // checking outlet temperature to see if it reaches a certain level
-      else if (run_time >= TEMP_CHECK_TIME && outlet_temp - inlet_temp < MIN_COOLANT_DELTA) {
-        Serial.println(F("Temperature Reached Critical level"));
+      // Check that the engine is producing thrust once throttle valves are fully open
+      else if (fuel_setting == fuel_target && oxy_setting == oxy_target && force < MIN_THRUST) {
+        Serial.println(F("Thrust below critical level"));
         abort_autosequence();
       }
       
