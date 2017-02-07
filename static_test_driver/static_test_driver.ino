@@ -3,7 +3,7 @@
 #define MK_2 2
 
 // Change this line to set configuration
-#define CONFIGURATION MK_1
+#define CONFIGURATION MK_2
 
 #if !(CONFIGURATION == DEMO || CONFIGURATION == MK_1 || CONFIGURATION == MK_2)
 #error "Invalid configuration value"
@@ -18,10 +18,8 @@
 #include <Telemetry.h>
 #include <avr/pgmspace.h>
 
+// Accelerometer
 Adafruit_MMA8451 mma = Adafruit_MMA8451();
-const int chipSelect=10;                            // Use digital pin 10 as the slave select pin (SPI bus).
-float chamber_temp, inlet_temp, outlet_temp, pressure, force, x,y,z;
-bool sensor_status = true;
 
 // Thermocouple and pressure setup for MK_2
 #if CONFIGURATION == MK_2
@@ -31,7 +29,7 @@ bool sensor_status = true;
 Adafruit_MAX31855 Chamber_Thermocouple(MAXCLK1, MAXCS1, MAXDO1);
 #define PRESSURE_CALIBRATION_FACTOR 246.58
 #define PRESSURE_OFFSET 118.33
-#define PRESSURE_PIN 1
+#define PRESSURE_PIN A1
 #endif
 
 // Thermocouple Setup
@@ -46,9 +44,13 @@ Adafruit_MAX31855 Outlet_Thermocouple(MAXCLK3, MAXCS3, MAXDO3);
 
 // Force Setup
 #define calibration_factor 20400.0 //This value is obtained using the SparkFun_HX711_Calibration sketch
-#define DOUT  13
+#define DOUT  15
 #define CLK  14
 HX711 scale(DOUT, CLK);
+
+// Sensor data
+float chamber_temp, inlet_temp, outlet_temp, pressure, force, x,y,z;
+bool sensor_status = true;
 
 // Engine control setup
 int fuel_target = 0;
