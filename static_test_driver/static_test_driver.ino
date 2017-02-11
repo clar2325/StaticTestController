@@ -187,10 +187,10 @@ void loop() {
   READ_FLAG(stop) {
     abort_autosequence();
   }
-  READ_FIELD(fuel_command, "%d") {
+  READ_FIELD(fuel_command, "%d", fuel_command) {
     fuel_throttle(fuel_command);
   }
-  READ_FIELD(oxy_command, "%d") {
+  READ_FIELD(oxy_command, "%d", oxy_command) {
     oxy_throttle(oxy_command);
   }
   READ_DEFAULT(data_name, data) {
