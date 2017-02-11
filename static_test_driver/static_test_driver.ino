@@ -26,7 +26,7 @@ Adafruit_MMA8451 mma = Adafruit_MMA8451();
 #define MAXDO1   3
 #define MAXCS1   4
 #define MAXCLK1  5
-Adafruit_MAX31855 Chamber_Thermocouple(MAXCLK1, MAXCS1, MAXDO1);
+Adafruit_MAX31855 chamber_thermocouple(MAXCLK1, MAXCS1, MAXDO1);
 #define PRESSURE_CALIBRATION_FACTOR 246.58
 #define PRESSURE_OFFSET 118.33
 #define PRESSURE_PIN A1
@@ -39,8 +39,8 @@ Adafruit_MAX31855 Chamber_Thermocouple(MAXCLK1, MAXCS1, MAXDO1);
 #define MAXDO3   9
 #define MAXCS3   11
 #define MAXCLK3  12
-Adafruit_MAX31855 Inlet_Thermocouple(MAXCLK2, MAXCS2, MAXDO2);
-Adafruit_MAX31855 Outlet_Thermocouple(MAXCLK3, MAXCS3, MAXDO3);
+Adafruit_MAX31855 inlet_thermocouple(MAXCLK2, MAXCS2, MAXDO2);
+Adafruit_MAX31855 outlet_thermocouple(MAXCLK3, MAXCS3, MAXDO3);
 
 // Force Setup
 #define calibration_factor 20400.0 //This value is obtained using the SparkFun_HX711_Calibration sketch
@@ -65,39 +65,46 @@ void setup() {
   while (!Serial);
   Serial.begin(230400);
   Serial.println(F("Initializing..."));
-  // wait for MAX chip to stabilize
+  // wait for MAX chips to stabilize
   delay(500);
   //--------------------Set up thermocouple and pressure sensor for MK_2--------------------
   #if CONFIGURATION == MK_2
-  chamber_temp = Chamber_Thermocouple.readCelsius();
-  if (isnan(chamber_temp)) {
-    Serial.println(F("Chamber Temp sensor err"));
+  chamber_temp = chamber_thermocouple.readCelsius();
+  if (isnan(chamber_temp) || chamber_temp == 0) {
+    Serial.println(F("Chamber Temp sensor error"));
     sensor_status = false;
   }
   else {
     Serial.println(F("Chamber Temp sensor connected"));
   }
+  delay(100);
+  
   pinMode(PRESSURE_PIN, INPUT);
   #endif
   
   //------------------Set up thermocouples-------------------------------
-  inlet_temp = Inlet_Thermocouple.readCelsius();
-  if (isnan(inlet_temp)) {
-    Serial.println(F("Inlet Temp sensor err"));
+  inlet_temp = inlet_thermocouple.readCelsius();
+  if (isnan(inlet_temp) || inlet_temp == 0) {
+    Serial.println(F("Inlet Temp sensor error"));
     sensor_status = false;
   } 
   else {
     Serial.println(F("Inlet Temp sensor connected"));
+    Serial.println(inlet_temp);
   }
-  outlet_temp = Outlet_Thermocouple.readCelsius();
-  if (isnan(outlet_temp)) {
-    Serial.println(F("Outlet Temp sensor err"));
+  delay(100);
+  
+  outlet_temp = outlet_thermocouple.readCelsius();
+  if (isnan(outlet_temp) || outlet_temp == 0) {
+    Serial.println(F("Outlet Temp sensor error"));
     sensor_status = false;
   }
   else {
     Serial.println(F("Outlet Temp sensor connected"));
   }
-  //Calibrate load cell
+  delay(100);
+  
+  // Calibrate load cell
   scale.set_scale(calibration_factor); //This value is obtained by using the SparkFun_HX711_Calibration sketch
   
    //-------------set up accelerometer---------------
@@ -105,17 +112,15 @@ void setup() {
     Serial.println(F("Accelerometer error"));
     sensor_status = false;
   }
-  
-  mma.setRange(MMA8451_RANGE_2_G);  // set acc range (2 5 8)
-  Serial.print(F("Accelerometer range ")); 
-  Serial.print(2 << mma.getRange()); 
-  Serial.println("G");
+  else {
+    mma.setRange(MMA8451_RANGE_2_G);  // set acc range (2 5 8)
+    Serial.print(F("Accelerometer range ")); 
+    Serial.print(2 << mma.getRange()); 
+    Serial.println("G");
+  }
+  delay(100);
   
   Wire.begin();
-
-  // Halt in an infinite loop if initialization failed
-  if (!sensor_status)
-    abort();
 }
 
 void loop() {
@@ -124,24 +129,24 @@ void loop() {
   
   //--------------Grab Temp Data for MK_2
   #if CONFIGURATION == MK_2
-  chamber_temp = Chamber_Thermocouple.readCelsius();
-  if (isnan(chamber_temp)) {
-    Serial.println(F("Chamber Temp sensor err"));
+  chamber_temp = chamber_thermocouple.readCelsius();
+  if (sensor_status && (isnan(chamber_temp) || chamber_temp == 0)) {
+    Serial.println(F("Chamber Temp sensor error"));
     sensor_status = false;
   }
   //---------------Grab Pressure Data-------------------
-  pressure = (analogRead (PRESSURE_PIN)* 5/ 1024.) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET; //Pressure is measured in PSIG
+  pressure = (analogRead (PRESSURE_PIN)* 5/ 1024.0) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET; // Pressure is measured in PSIG
   #endif
   
   // --------------Grab Tempdata------------------------ 
-  inlet_temp = Inlet_Thermocouple.readCelsius();
-  if (isnan(inlet_temp)) {
-    Serial.println(F("Inlet Temp sensor err"));
+  inlet_temp = inlet_thermocouple.readCelsius();
+  if (sensor_status && (isnan(inlet_temp) || inlet_temp == 0)) {
+    Serial.println(F("Inlet Temp sensor error"));
     sensor_status = false;
   }
-  outlet_temp = Outlet_Thermocouple.readCelsius();
-  if (isnan(outlet_temp)) {
-    Serial.println(F("Outlet Temp sensor err"));
+  outlet_temp = outlet_thermocouple.readCelsius();
+  if (sensor_status && (isnan(outlet_temp) || outlet_temp == 0)) {
+    Serial.println(F("Outlet Temp sensor error"));
     sensor_status = false;
   }
   
@@ -171,7 +176,7 @@ void loop() {
   
   BEGIN_READ
   READ_FLAG(zero) {
-    scale.tare(); //Load Cell, Assuming there is no weight on the scale at start up, reset the scale to 0
+    scale.tare(); // Load Cell, Assuming there is no weight on the scale at start up, reset the scale to 0
   }
   READ_FLAG(reset) {
     asm volatile ("  jmp 0"); // Perform a software reset of the board, reinitializing sensors

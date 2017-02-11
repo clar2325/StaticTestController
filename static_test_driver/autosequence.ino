@@ -22,7 +22,7 @@ enum state {
   COOL_DOWN
 };
 
-// Convinence
+// Convenience
 #define SET_STATE(STATE) {\
   state = STATE;          \
   SEND(status, #STATE);   \
@@ -32,11 +32,16 @@ long start_time = 0;
 long shutdown_time = 0;
 enum state state = STAND_BY;
 
-//changed start_autosequence to start_countdown which is called in the standby state
 void start_countdown() {
-  Serial.println(F("Countdown started"));
-  SET_STATE(TERMINAL_COUNT)
-  start_time = millis();
+  if (sensor_status) {
+    Serial.println(F("Countdown started"));
+    SET_STATE(TERMINAL_COUNT)
+    start_time = millis();
+  }
+  else {
+    Serial.println(F("Countdown cannot be started due to sensor failure"));
+    SET_STATE(STAND_BY) // Set state to signal countdown was aborted
+  }
 }
 
 void abort_autosequence() {
@@ -75,7 +80,6 @@ void run_control() {
       }
       break;
     case ENGINE_RUNNING:
-
       // Check that the sensors are still working
       if (!sensor_status) {
         Serial.println(F("Sensor failure"));
