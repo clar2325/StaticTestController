@@ -19,28 +19,33 @@
 #include <avr/pgmspace.h>
 
 // Accelerometer
-Adafruit_MMA8451 mma = Adafruit_MMA8451();
+Adafruit_MMA8451 mma;
+
+// Thermocouple Setup
+#define MAXDO   9
+#define MAXCLK  12
+
+#define MAXCS1  5
+#define MAXCS2  11
+Adafruit_MAX31855 inlet_thermocouple(MAXCLK, MAXCS1, MAXDO);
+Adafruit_MAX31855 outlet_thermocouple(MAXCLK, MAXCS2, MAXDO);
 
 // Thermocouple and pressure setup for MK_2
 #if CONFIGURATION == MK_2
-#define MAXDO1   3
-#define MAXCS1   4
-#define MAXCLK1  5
-Adafruit_MAX31855 chamber_thermocouple(MAXCLK1, MAXCS1, MAXDO1);
+#define MAXCS3  47
+Adafruit_MAX31855 chamber_thermocouple(MAXCLK, MAXCS3, MAXDO);
+
 #define PRESSURE_CALIBRATION_FACTOR 246.58
 #define PRESSURE_OFFSET 118.33
 #define PRESSURE_PIN A1
-#endif
 
-// Thermocouple Setup
-#define MAXDO2   6
-#define MAXCS2   7
-#define MAXCLK2  8
-#define MAXDO3   9
-#define MAXCS3   11
-#define MAXCLK3  12
-Adafruit_MAX31855 inlet_thermocouple(MAXCLK2, MAXCS2, MAXDO2);
-Adafruit_MAX31855 outlet_thermocouple(MAXCLK3, MAXCS3, MAXDO3);
+#define PRESSURE_NUM_HIST_VALS 10
+
+float pressure_hist_vals[PRESSURE_NUM_HIST_VALS];
+int pressure_val_num = 0;
+bool pressure_zero_ready = false;
+float pressure_zero_val = 0;
+#endif
 
 // Force Setup
 #define calibration_factor 20400.0 //This value is obtained using the SparkFun_HX711_Calibration sketch
@@ -90,7 +95,6 @@ void setup() {
   } 
   else {
     Serial.println(F("Inlet Temp sensor connected"));
-    Serial.println(inlet_temp);
   }
   delay(100);
   
@@ -134,8 +138,17 @@ void loop() {
     Serial.println(F("Chamber Temp sensor error"));
     sensor_status = false;
   }
+  
   //---------------Grab Pressure Data-------------------
-  pressure = (analogRead (PRESSURE_PIN)* 5/ 1024.0) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET; // Pressure is measured in PSIG
+  pressure = (analogRead (PRESSURE_PIN)* 5/ 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val); // Pressure is measured in PSIG
+
+  // Update pressure tare data
+  pressure_hist_vals[pressure_val_num] = pressure;
+  pressure_val_num++;
+  if (pressure_val_num >= PRESSURE_NUM_HIST_VALS) {
+    pressure_val_num = 0;
+    pressure_zero_ready = true;
+  }
   #endif
   
   // --------------Grab Tempdata------------------------ 
@@ -175,11 +188,26 @@ void loop() {
   int fuel_command, oxy_command;
   
   BEGIN_READ
-  READ_FLAG(zero) {
-    scale.tare(); // Load Cell, Assuming there is no weight on the scale at start up, reset the scale to 0
+  READ_FLAG(zero_force) {
+    Serial.println(F("Zeroing load cell"));
+    scale.tare(); // Load Cell, Assuming there is no weight on the scale, reset to 0
+  }
+  READ_FLAG(zero_pressure) {
+    if (pressure_zero_ready) {
+      Serial.println(F("Zeroing pressure"));
+      pressure_zero_ready = false;
+      pressure_zero_val = 0;
+      for (int i = 0; i < PRESSURE_NUM_HIST_VALS; i++)
+        pressure_zero_val += pressure_hist_vals[i];
+      pressure_zero_val /= PRESSURE_NUM_HIST_VALS;
+    }
+    else {
+      Serial.println(F("Zero value not ready"));
+    }
   }
   READ_FLAG(reset) {
-    asm volatile ("  jmp 0"); // Perform a software reset of the board, reinitializing sensors
+    Serial.println(F("Resetting board"));
+    asm volatile("  jmp 0"); // Perform a software reset of the board, reinitializing sensors
   }
   READ_FLAG(start) {
     start_countdown();
