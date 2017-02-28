@@ -55,6 +55,15 @@ HX711 scale(DOUT, CLK);
 
 // Sensor data
 float chamber_temp, inlet_temp, outlet_temp, pressure, force, x,y,z;
+
+#define SENSOR_ERROR_LIMIT 5 // Max number of errors in a row before deciding a sensor is faulty
+
+int chamber_temp_error = 0;
+int inlet_temp_error = 0;
+int outlet_temp_error = 0;
+int pressure_error = 0;
+int force_error = 0;
+int accel_error = 0;
 bool sensor_status = true;
 
 // Engine control setup
@@ -74,39 +83,14 @@ void setup() {
   delay(500);
   //--------------------Set up thermocouple and pressure sensor for MK_2--------------------
   #if CONFIGURATION == MK_2
-  chamber_temp = chamber_thermocouple.readCelsius();
-  if (isnan(chamber_temp) || chamber_temp == 0) {
-    Serial.println(F("Chamber Temp sensor error"));
-    sensor_status = false;
-  }
-  else {
-    Serial.println(F("Chamber Temp sensor connected"));
-  }
-  delay(100);
+  init_thermocouple("Chamber", chamber_thermocouple);
   
   pinMode(PRESSURE_PIN, INPUT);
   #endif
   
   //------------------Set up thermocouples-------------------------------
-  inlet_temp = inlet_thermocouple.readCelsius();
-  if (isnan(inlet_temp) || inlet_temp == 0) {
-    Serial.println(F("Inlet Temp sensor error"));
-    sensor_status = false;
-  } 
-  else {
-    Serial.println(F("Inlet Temp sensor connected"));
-  }
-  delay(100);
-  
-  outlet_temp = outlet_thermocouple.readCelsius();
-  if (isnan(outlet_temp) || outlet_temp == 0) {
-    Serial.println(F("Outlet Temp sensor error"));
-    sensor_status = false;
-  }
-  else {
-    Serial.println(F("Outlet Temp sensor connected"));
-  }
-  delay(100);
+  init_thermocouple("Inlet", inlet_thermocouple);
+  init_thermocouple("Outlet", outlet_thermocouple);
   
   // Calibrate load cell
   scale.set_scale(calibration_factor); //This value is obtained by using the SparkFun_HX711_Calibration sketch
@@ -129,18 +113,16 @@ void setup() {
 
 void loop() {
   //--------------Grab Force Data----------------------
-  force = scale.get_units(); //Force is measured in lbs
+  force = scale.get_units(); // Force is measured in lbs
+  // TODO: Error checking
   
   //--------------Grab Temp Data for MK_2
   #if CONFIGURATION == MK_2
-  chamber_temp = chamber_thermocouple.readCelsius();
-  if (sensor_status && (isnan(chamber_temp) || chamber_temp == 0)) {
-    Serial.println(F("Chamber Temp sensor error"));
-    sensor_status = false;
-  }
+  chamber_temp = read_thermocouple("Chamber", chamber_thermocouple, chamber_temp_error);
   
   //---------------Grab Pressure Data-------------------
   pressure = (analogRead (PRESSURE_PIN)* 5/ 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val); // Pressure is measured in PSIG
+  // TODO: Error checking
 
   // Update pressure tare data
   pressure_hist_vals[pressure_val_num] = pressure;
@@ -152,23 +134,15 @@ void loop() {
   #endif
   
   // --------------Grab Tempdata------------------------ 
-  inlet_temp = inlet_thermocouple.readCelsius();
-  if (sensor_status && (isnan(inlet_temp) || inlet_temp == 0)) {
-    Serial.println(F("Inlet Temp sensor error"));
-    sensor_status = false;
-  }
-  outlet_temp = outlet_thermocouple.readCelsius();
-  if (sensor_status && (isnan(outlet_temp) || outlet_temp == 0)) {
-    Serial.println(F("Outlet Temp sensor error"));
-    sensor_status = false;
-  }
+  inlet_temp = read_thermocouple("Inlet", inlet_thermocouple, inlet_temp_error);
+  outlet_temp = read_thermocouple("Outlet", outlet_thermocouple, outlet_temp_error);
   
   //----------Grab Acc Data (acceleration is measured in m/s^2)
   sensors_event_t event;
-  mma.getEvent(&event);
+  mma.getEvent(&event); // TODO: Error checking
   x=event.acceleration.x;  y=event.acceleration.y;  z=event.acceleration.z;
 
-  // Run autonoumous control
+  // Run autonomous control
   run_control();
 
   BEGIN_SEND

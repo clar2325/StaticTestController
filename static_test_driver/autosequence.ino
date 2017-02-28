@@ -39,13 +39,13 @@ void start_countdown() {
     start_time = millis();
   }
   else {
-    Serial.println(F("Countdown cannot be started due to sensor failure"));
+    Serial.println(F("Countdown aborted due to sensor failure"));
     SET_STATE(STAND_BY) // Set state to signal countdown was aborted
   }
 }
 
 void abort_autosequence() {
-  Serial.println(F("Autosequencer aborted"));
+  Serial.println(F("Run aborted"));
   switch (state) {
     case STAND_BY:
     case TERMINAL_COUNT:
@@ -106,7 +106,7 @@ void run_control() {
     
     case COOL_DOWN:
       if (millis() - shutdown_time >= COOLDOWN_TIME) {
-        Serial.println(F("Autosequencer finished"));
+        Serial.println(F("Run finished"));
         SET_STATE(STAND_BY)
         start_time = 0;
       }
