@@ -3,7 +3,7 @@
 #define MK_2 2
 
 // Change this line to set configuration
-#define CONFIGURATION MK_2
+#define CONFIGURATION MK_1
 
 #if !(CONFIGURATION == DEMO || CONFIGURATION == MK_1 || CONFIGURATION == MK_2)
 #error "Invalid configuration value"
@@ -56,11 +56,33 @@ bool pressure_zero_ready = false;
 float pressure_zero_val = 0;
 #endif
 
-// Force Setup
-#define FORCE_CALIBRATION_FACTOR 20400.0 //This value is obtained using the SparkFun_HX711_Calibration sketch
-#define FORCE_DOUT 32
-#define FORCE_CLK  26
-HX711 scale(FORCE_DOUT, FORCE_CLK);
+// Load cell setup
+#define LOAD_CELL_CALIBRATION_FACTOR 20400.0 //This value is obtained using the SparkFun_HX711_Calibration sketch
+#define LOAD_CELL_DOUT 32
+#define LOAD_CELL_CLK  26
+HX711 scale(LOAD_CELL_DOUT, LOAD_CELL_CLK);
+
+// Force plate setup
+#define FORCE_PLATE_PIN A0
+
+#define HIGH_RANGE
+
+#ifdef HIGH_RANGE
+#define FORCE_PLATE_INTERCEPT -250
+#define FORCE_PLATE_SLOPE 250
+
+#else
+#define FORCE_PLATE_INTERCEPT -1000
+#define FORCE_PLATE_SLOPE 1000
+
+#endif
+
+#define FORCE_PLATE_NUM_HIST_VALS 10
+
+float force_hist_vals[FORCE_PLATE_NUM_HIST_VALS];
+int force_val_num = 0;
+bool force_zero_ready = false;
+float force_zero_val = 0;
 
 // Sensor data
 float chamber_temp, inlet_temp, outlet_temp, pressure, force, x,y,z;
@@ -112,9 +134,14 @@ void setup() {
   // Set up thermocouples
   init_thermocouple("Inlet", THERMO1_LED, inlet_thermocouple);
   init_thermocouple("Outlet", THERMO2_LED, outlet_thermocouple);
-  
+
+  #if CONFIGURATION == MK_2
   // Calibrate load cell
-  //scale.set_scale(FORCE_CALIBRATION_FACTOR); // This value is obtained by using the SparkFun_HX711_Calibration sketch
+  scale.set_scale(LOAD_CELL_CALIBRATION_FACTOR); // This value is obtained by using the SparkFun_HX711_Calibration sketch
+  #else
+  // Init force plate
+  pinMode(FORCE_PLATE_PIN, INPUT);
+  #endif
   
   // Set up accelerometer
   init_accelerometer(mma, STATE_LED);// Should be pin 13
@@ -124,7 +151,21 @@ void setup() {
 
 void loop() {
   // Grab force data
+  #if CONFIGURATION == MK_2
   force = scale.get_units(); // Force is measured in lbs
+
+  #else
+  float count = analogRead(FORCE_PLATE_PIN);
+  float voltage = count / 1023 * 5.0;// convert from count to raw voltage
+  force = FORCE_PLATE_INTERCEPT + voltage * FORCE_PLATE_SLOPE - force_zero_val; //converts voltage to sensor reading
+
+  force_hist_vals[force_val_num] = force;
+  force_val_num++;
+  if (force_val_num >= FORCE_PLATE_NUM_HIST_VALS) {
+    force_val_num = 0;
+    force_zero_ready = true;
+  }
+  #endif
   // TODO: Error checking
   
   // Grab thermocouple data for Mk.2
@@ -175,9 +216,26 @@ void loop() {
   
   BEGIN_READ
   READ_FLAG(zero_force) {
+    #if CONFIGURATION == MK_2
     Serial.println(F("Zeroing load cell"));
     scale.tare(); // Load Cell, Assuming there is no weight on the scale, reset to 0
+
+    #else
+    if (force_zero_ready) {
+      Serial.println(F("Zeroing force plate"));
+      force_zero_ready = false;
+      force_zero_val = 0;
+      for (int i = 0; i < FORCE_PLATE_NUM_HIST_VALS; i++)
+        force_zero_val += force_hist_vals[i];
+      force_zero_val /= FORCE_PLATE_NUM_HIST_VALS;
+    }
+    else {
+      Serial.println(F("Force zero value not ready"));
+    }
+
+    #endif
   }
+  #if CONFIGURATION == MK_2
   READ_FLAG(zero_pressure) {
     if (pressure_zero_ready) {
       Serial.println(F("Zeroing pressure"));
@@ -188,9 +246,10 @@ void loop() {
       pressure_zero_val /= PRESSURE_NUM_HIST_VALS;
     }
     else {
-      Serial.println(F("Zero value not ready"));
+      Serial.println(F("Pressure zero value not ready"));
     }
   }
+  #endif
   READ_FLAG(reset) {
     Serial.println(F("Resetting board"));
     asm volatile("  jmp 0"); // Perform a software reset of the board, reinitializing sensors

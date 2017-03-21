@@ -1,6 +1,6 @@
 
 void init_thermocouple(const char *sensor_name, int led, Adafruit_MAX31855 &thermocouple) {
-  float result = chamber_thermocouple.readCelsius();
+  float result = thermocouple.readCelsius();
   if (isnan(result) || result == 0) {
     Serial.print(sensor_name);
     Serial.println(F(" temp sensor error"));
