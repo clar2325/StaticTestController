@@ -18,21 +18,30 @@
 #include <Telemetry.h>
 #include <avr/pgmspace.h>
 
+// LEDs
+#define THERMO1_LED 23
+#define THERMO2_LED 25
+#define THERMO3_LED 27
+#define FORCE_LED 29
+#define PRESSURE_LED 31
+#define STATE_LED 33
+#define STATUS_LED 35
+
 // Accelerometer
 Adafruit_MMA8451 mma;
 
 // Thermocouple Setup
-#define MAXDO   9
-#define MAXCLK  12
+#define MAXDO   50
+#define MAXCLK  52
 
-#define MAXCS1  5
-#define MAXCS2  11
+#define MAXCS1  43
+#define MAXCS2  30
 Adafruit_MAX31855 inlet_thermocouple(MAXCLK, MAXCS1, MAXDO);
 Adafruit_MAX31855 outlet_thermocouple(MAXCLK, MAXCS2, MAXDO);
 
 // Thermocouple and pressure setup for MK_2
 #if CONFIGURATION == MK_2
-#define MAXCS3  47
+#define MAXCS3  32
 Adafruit_MAX31855 chamber_thermocouple(MAXCLK, MAXCS3, MAXDO);
 
 #define PRESSURE_CALIBRATION_FACTOR 246.58
@@ -48,10 +57,10 @@ float pressure_zero_val = 0;
 #endif
 
 // Force Setup
-#define calibration_factor 20400.0 //This value is obtained using the SparkFun_HX711_Calibration sketch
-#define DOUT  15
-#define CLK  14
-HX711 scale(DOUT, CLK);
+#define FORCE_CALIBRATION_FACTOR 20400.0 //This value is obtained using the SparkFun_HX711_Calibration sketch
+#define FORCE_DOUT 32
+#define FORCE_CLK  26
+HX711 scale(FORCE_DOUT, FORCE_CLK);
 
 // Sensor data
 float chamber_temp, inlet_temp, outlet_temp, pressure, force, x,y,z;
@@ -76,51 +85,53 @@ char data[10] = "";
 char data_name[20] = "";
 
 void setup() {
+  // Initialize LED pins to be outputs
+  pinMode(THERMO1_LED, OUTPUT);
+  pinMode(THERMO2_LED, OUTPUT);
+  pinMode(THERMO3_LED, OUTPUT);
+  pinMode(FORCE_LED, OUTPUT);
+  pinMode(PRESSURE_LED, OUTPUT);
+  pinMode(STATE_LED, OUTPUT);
+  pinMode(STATUS_LED, OUTPUT);
+
+  // Initialize serial
   while (!Serial);
   Serial.begin(230400);
   Serial.println(F("Initializing..."));
+  
   // wait for MAX chips to stabilize
   delay(500);
-  //--------------------Set up thermocouple and pressure sensor for MK_2--------------------
+  
+  // Set up thermocouple and pressure sensor for Mk.2
   #if CONFIGURATION == MK_2
-  init_thermocouple("Chamber", chamber_thermocouple);
+  init_thermocouple("Chamber", THERMO3_LED, chamber_thermocouple);
   
   pinMode(PRESSURE_PIN, INPUT);
   #endif
   
-  //------------------Set up thermocouples-------------------------------
-  init_thermocouple("Inlet", inlet_thermocouple);
-  init_thermocouple("Outlet", outlet_thermocouple);
+  // Set up thermocouples
+  init_thermocouple("Inlet", THERMO1_LED, inlet_thermocouple);
+  init_thermocouple("Outlet", THERMO2_LED, outlet_thermocouple);
   
   // Calibrate load cell
-  scale.set_scale(calibration_factor); //This value is obtained by using the SparkFun_HX711_Calibration sketch
+  //scale.set_scale(FORCE_CALIBRATION_FACTOR); // This value is obtained by using the SparkFun_HX711_Calibration sketch
   
-   //-------------set up accelerometer---------------
-  if (!mma.begin()) {
-    Serial.println(F("Accelerometer error"));
-    sensor_status = false;
-  }
-  else {
-    mma.setRange(MMA8451_RANGE_2_G);  // set acc range (2 5 8)
-    Serial.print(F("Accelerometer range ")); 
-    Serial.print(2 << mma.getRange()); 
-    Serial.println("G");
-  }
-  delay(100);
+  // Set up accelerometer
+  init_accelerometer(mma, STATE_LED);// Should be pin 13
   
   Wire.begin();
 }
 
 void loop() {
-  //--------------Grab Force Data----------------------
+  // Grab force data
   force = scale.get_units(); // Force is measured in lbs
   // TODO: Error checking
   
-  //--------------Grab Temp Data for MK_2
+  // Grab thermocouple data for Mk.2
   #if CONFIGURATION == MK_2
-  chamber_temp = read_thermocouple("Chamber", chamber_thermocouple, chamber_temp_error);
+  chamber_temp = read_thermocouple("Chamber", THERMO3_LED, chamber_thermocouple, chamber_temp_error);
   
-  //---------------Grab Pressure Data-------------------
+  // Grab pressure data
   pressure = (analogRead (PRESSURE_PIN)* 5/ 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val); // Pressure is measured in PSIG
   // TODO: Error checking
 
@@ -133,18 +144,18 @@ void loop() {
   }
   #endif
   
-  // --------------Grab Tempdata------------------------ 
-  inlet_temp = read_thermocouple("Inlet", inlet_thermocouple, inlet_temp_error);
-  outlet_temp = read_thermocouple("Outlet", outlet_thermocouple, outlet_temp_error);
+  // Grab thermocouple data
+  inlet_temp = read_thermocouple("Inlet", THERMO1_LED, inlet_thermocouple, inlet_temp_error);
+  outlet_temp = read_thermocouple("Outlet", THERMO2_LED, outlet_thermocouple, outlet_temp_error);
   
-  //----------Grab Acc Data (acceleration is measured in m/s^2)
-  sensors_event_t event;
-  mma.getEvent(&event); // TODO: Error checking
-  x=event.acceleration.x;  y=event.acceleration.y;  z=event.acceleration.z;
+  // Grab accelerometer data (acceleration is measured in m/s^2)
+  sensors_vec_t accel = read_accelerometer(mma, accel_error);
+  x=accel.x;  y=accel.y;  z=accel.z;
 
   // Run autonomous control
   run_control();
 
+  // Send collected data
   BEGIN_SEND
   SEND_ITEM(force, force)
   SEND_ITEM(acceleration, x)
@@ -158,7 +169,8 @@ void loop() {
   #endif
   SEND_ITEM(sensor_status, sensor_status)
   END_SEND
-  
+
+  // Read a command
   int fuel_command, oxy_command;
   
   BEGIN_READ

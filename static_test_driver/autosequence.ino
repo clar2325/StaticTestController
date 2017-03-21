@@ -15,6 +15,10 @@
 #define MIN_THRUST 1000
 #endif
 
+// State LED
+#define TERMINAL_COUNT_LED_PERIOD 250
+#define COOL_DOWN_LED_PERIOD 1000
+
 enum state {
   STAND_BY,
   TERMINAL_COUNT,
@@ -24,9 +28,9 @@ enum state {
 
 // Convenience
 #define SET_STATE(STATE) {\
-  state = STATE;          \
-  SEND(status, #STATE);   \
-}
+    state = STATE;          \
+    SEND(status, #STATE);   \
+  }
 
 long start_time = 0;
 long shutdown_time = 0;
@@ -64,11 +68,11 @@ void abort_autosequence() {
 void run_control() {
   long run_time = millis() - start_time - COUNTDOWN_DURATION;
   SEND(run_time, run_time)
-  
+
   // TODO: There should be a lot more here, also checking if things went wrong
   switch (state) {
     case STAND_BY:
-      //state that waits for a person to begin the test
+      // state that waits for a person to begin the test
       break;
     case TERMINAL_COUNT:
       //countdown state
@@ -95,7 +99,7 @@ void run_control() {
         Serial.println(F("Thrust below critical level"));
         abort_autosequence();
       }
-      
+
       if (run_time >= RUN_TIME) {
         SET_STATE(COOL_DOWN)
         fuel_throttle(0);
@@ -103,8 +107,9 @@ void run_control() {
         shutdown_time = millis();
       }
       break;
-    
+
     case COOL_DOWN:
+      digitalWrite(STATE_LED, (millis() % COOL_DOWN_LED_PERIOD) * 2 / COOL_DOWN_LED_PERIOD);
       if (millis() - shutdown_time >= COOLDOWN_TIME) {
         Serial.println(F("Run finished"));
         SET_STATE(STAND_BY)
