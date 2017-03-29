@@ -1,15 +1,24 @@
 // Timing
-#define COUNTDOWN_DURATION 60000 // 1 min
 #define START_TIME  0
-#define RUN_TIME  30000
-#define COOLDOWN_TIME 60000 * 5 // 5 mins
+
+#if CONFIGURATION == DEMO
+#define COUNTDOWN_DURATION 10000 // 10 sec
+#define RUN_TIME           10000 // 10 sec
+#define COOLDOWN_TIME      10000 // 10 sec
+#else
+#define COUNTDOWN_DURATION 60000 // 1 min
+#define RUN_TIME           30000 // 30 sec
+#define COOLDOWN_TIME      60000 * 5 // 5 mins
+#endif
 
 // Limits
 // Max outlet temperature before triggering a shutdown
 #define MAX_COOLANT_TEMP 60
 
 // Min thrust that must be reached to avoid triggering a no-ignition shutdown
-#if CONFIGURATION == DEMO || CONFIGURATION == MK_1
+#if CONFIGURATION == DEMO
+#define MIN_THRUST 100
+#elif CONFIGURATION == MK_1
 #define MIN_THRUST 100
 #elif CONFIGURATION == MK_2
 #define MIN_THRUST 1000
@@ -95,7 +104,11 @@ void run_control() {
         abort_autosequence();
       }
       // Check that the engine is producing thrust once throttle valves are fully open
+#if CONFIGURATION != DEMO
       else if (fuel_setting == fuel_target && oxy_setting == oxy_target && force < MIN_THRUST) {
+#else
+      else if (force < MIN_THRUST) {
+#endif
         Serial.println(F("Thrust below critical level"));
         abort_autosequence();
       }

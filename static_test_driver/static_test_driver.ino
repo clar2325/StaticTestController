@@ -3,7 +3,7 @@
 #define MK_2 2
 
 // Change this line to set configuration
-#define CONFIGURATION MK_1
+#define CONFIGURATION DEMO
 
 #if !(CONFIGURATION == DEMO || CONFIGURATION == MK_1 || CONFIGURATION == MK_2)
 #error "Invalid configuration value"
@@ -31,8 +31,8 @@
 Adafruit_MMA8451 mma;
 
 // Thermocouple Setup
-#define MAXDO   50
-#define MAXCLK  52
+#define MAXDO   24
+#define MAXCLK  22
 
 #define MAXCS1  43
 #define MAXCS2  30
@@ -63,9 +63,9 @@ float pressure_zero_val = 0;
 HX711 scale(LOAD_CELL_DOUT, LOAD_CELL_CLK);
 
 // Force plate setup
-#define FORCE_PLATE_PIN A0
+#define FORCE_PLATE_PIN A2
 
-#define HIGH_RANGE
+//#define HIGH_RANGE
 
 #ifdef HIGH_RANGE
 #define FORCE_PLATE_INTERCEPT -250
@@ -118,7 +118,7 @@ void setup() {
 
   // Initialize serial
   while (!Serial);
-  Serial.begin(230400);
+  Serial.begin(115200);
   Serial.println(F("Initializing..."));
   
   // wait for MAX chips to stabilize
