@@ -1,5 +1,8 @@
 // Timing
-#define START_TIME  0
+#define PRESTAGE_PREP_TIME -1000 // Time at which to open the prestage valves
+#define PRESTAGE_TIME      0
+#define MAINSTAGE_TIME     1000
+#define STARTUP_TIME       3000  // Time at which to start checking the engine is producing thrust, etc.
 
 #if CONFIGURATION == DEMO
 #define COUNTDOWN_DURATION 10000 // 10 sec
@@ -28,12 +31,14 @@
 #define TERMINAL_COUNT_LED_PERIOD 250
 #define COOL_DOWN_LED_PERIOD 1000
 
-enum state {
+typedef enum {
   STAND_BY,
   TERMINAL_COUNT,
-  ENGINE_RUNNING,
+  PRESTAGE_READY,
+  PRESTAGE,
+  MAINSTAGE,
   COOL_DOWN
-};
+} state_t;
 
 // Convenience
 #define SET_STATE(STATE) {\
@@ -43,7 +48,7 @@ enum state {
 
 long start_time = 0;
 long shutdown_time = 0;
-enum state state = STAND_BY;
+state_t state = STAND_BY;
 
 void start_countdown() {
   if (sensor_status) {
@@ -65,10 +70,18 @@ void abort_autosequence() {
       SET_STATE(STAND_BY)
       break;
 
-    case ENGINE_RUNNING:
+    case PRESTAGE_READY:
+      set_valve(FUEL_PRE, 0);
+      set_valve(OXY_PRE, 0);
+      break;
+
+    case PRESTAGE:
+    case MAINSTAGE:
       SET_STATE(COOL_DOWN)
-      fuel_throttle(0);
-      oxy_throttle(0);
+      set_valve(FUEL_PRE, 0);
+      set_valve(FUEL_MAIN, 0);
+      set_valve(OXY_PRE, 0);
+      set_valve(OXY_MAIN, 0);
       shutdown_time = millis();
       break;
   }
@@ -81,18 +94,32 @@ void run_control() {
   // TODO: There should be a lot more here, also checking if things went wrong
   switch (state) {
     case STAND_BY:
-      // state that waits for a person to begin the test
+      // State that waits for a person to begin the test
       break;
     case TERMINAL_COUNT:
-      //countdown state
-      if (run_time >= START_TIME) {
-        SET_STATE(ENGINE_RUNNING)
-        fuel_throttle(10);
-        oxy_throttle(10);
+      // Countdown state
+      if (run_time >= PRESTAGE_PREP_TIME) {
+        SET_STATE(PRESTAGE_READY)
+        set_valve(FUEL_PRE, 1);
+        set_valve(OXY_PRE, 1);
+      }
+      break;
+    case PRESTAGE_READY:
+      // State to wait for ignition after prestage valves are open
+      if (run_time >= MAINSTAGE_TIME) {
+        SET_STATE(PRESTAGE)
         fire_ignitor();
       }
       break;
-    case ENGINE_RUNNING:
+    case PRESTAGE:
+      // State to wait for mainstage valves to be opened after ignition
+      if (run_time >= MAINSTAGE_TIME) {
+        SET_STATE(MAINSTAGE)
+        set_valve(FUEL_MAIN, 1);
+        set_valve(OXY_MAIN, 1);
+      }
+      break;
+    case MAINSTAGE:
       // Check that the sensors are still working
       if (!sensor_status) {
         Serial.println(F("Sensor failure"));
@@ -103,9 +130,9 @@ void run_control() {
         Serial.println(F("Temperature reached critical level"));
         abort_autosequence();
       }
-      // Check that the engine is producing thrust once throttle valves are fully open
+      // Check that the engine is producing thrust once mainstage valves are fully open
 #if CONFIGURATION != DEMO
-      else if (fuel_setting == fuel_target && oxy_setting == oxy_target && force < MIN_THRUST) {
+      else if (run_time >= STARTUP_TIME && force < MIN_THRUST) {
 #else
       else if (force < MIN_THRUST) {
 #endif
@@ -115,13 +142,16 @@ void run_control() {
 
       if (run_time >= RUN_TIME) {
         SET_STATE(COOL_DOWN)
-        fuel_throttle(0);
-        oxy_throttle(0);
+        set_valve(FUEL_PRE, 0);
+        set_valve(FUEL_MAIN, 0);
+        set_valve(OXY_PRE, 0);
+        set_valve(OXY_MAIN, 0);
         shutdown_time = millis();
       }
       break;
 
     case COOL_DOWN:
+      // State that waits for cool-down to take place after a run is complete
       digitalWrite(STATE_LED, (millis() % COOL_DOWN_LED_PERIOD) * 2 / COOL_DOWN_LED_PERIOD);
       if (millis() - shutdown_time >= COOLDOWN_TIME) {
         Serial.println(F("Run finished"));
@@ -130,6 +160,5 @@ void run_control() {
       }
       break;
   }
-  update_throttle();
 }
 

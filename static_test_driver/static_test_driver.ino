@@ -3,7 +3,7 @@
 #define MK_2 2
 
 // Change this line to set configuration
-#define CONFIGURATION DEMO
+#define CONFIGURATION MK_1
 
 #if !(CONFIGURATION == DEMO || CONFIGURATION == MK_1 || CONFIGURATION == MK_2)
 #error "Invalid configuration value"
@@ -98,13 +98,24 @@ int accel_error = 0;
 bool sensor_status = true;
 
 // Engine control setup
-int fuel_target = 0;
-int oxy_target = 0;
-int fuel_setting = 0;
-int oxy_setting = 0;
+typedef enum {
+  FUEL_PRE,
+  FUEL_MAIN,
+  OXY_PRE,
+  OXY_MAIN
+} valve_t;
+
+// TODO: Set these
+uint8_t valve_pins[] = {11, 12, 13, 14};
+
+const char *valve_names[] = {"Fuel prestage", "Fuel mainstage", "Oxygen prestage", "Oxygen mainstage"};
+const char *valve_telemetry_ids[] = {"fuel_pre_setting", "fuel_main_setting", "oxy_pre_setting", "oxy_main_setting"};
 
 char data[10] = "";
 char data_name[20] = "";
+
+// TODO: Set this
+#define IGNITOR_PIN 15
 
 void setup() {
   // Initialize LED pins to be outputs
@@ -124,14 +135,14 @@ void setup() {
   // wait for MAX chips to stabilize
   delay(500);
   
-  // Set up thermocouple and pressure sensor for Mk.2
+  // Initialize thermocouple and pressure sensor for Mk.2
   #if CONFIGURATION == MK_2
   init_thermocouple("Chamber", THERMO3_LED, chamber_thermocouple);
   
   pinMode(PRESSURE_PIN, INPUT);
   #endif
   
-  // Set up thermocouples
+  // Initialize thermocouples
   init_thermocouple("Inlet", THERMO1_LED, inlet_thermocouple);
   init_thermocouple("Outlet", THERMO2_LED, outlet_thermocouple);
 
@@ -139,14 +150,19 @@ void setup() {
   // Calibrate load cell
   scale.set_scale(LOAD_CELL_CALIBRATION_FACTOR); // This value is obtained by using the SparkFun_HX711_Calibration sketch
   #else
-  // Init force plate
+  // Initialize force plate
   pinMode(FORCE_PLATE_PIN, INPUT);
   #endif
   
-  // Set up accelerometer
-  init_accelerometer(mma, STATE_LED);// Should be pin 13
-  
+  // Initialize accelerometer
   Wire.begin();
+  init_accelerometer(mma, STATE_LED);// Should be pin 13
+
+  // Initialize engine controls
+  for (uint8_t i = 0; i < sizeof(valve_pins); i++) {
+    pinMode(valve_pins[i], OUTPUT);
+  }
+  pinMode(IGNITOR_PIN, OUTPUT);
 }
 
 void loop() {
@@ -173,7 +189,7 @@ void loop() {
   chamber_temp = read_thermocouple("Chamber", THERMO3_LED, chamber_thermocouple, chamber_temp_error);
   
   // Grab pressure data
-  pressure = (analogRead (PRESSURE_PIN)* 5/ 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val); // Pressure is measured in PSIG
+  pressure = (analogRead(PRESSURE_PIN) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val); // Pressure is measured in PSIG
   // TODO: Error checking
 
   // Update pressure tare data
@@ -212,7 +228,7 @@ void loop() {
   END_SEND
 
   // Read a command
-  int fuel_command, oxy_command;
+  bool valve_command;
   
   BEGIN_READ
   READ_FLAG(zero_force) {
@@ -260,11 +276,17 @@ void loop() {
   READ_FLAG(stop) {
     abort_autosequence();
   }
-  READ_FIELD(fuel_command, "%d", fuel_command) {
-    fuel_throttle(fuel_command);
+  READ_FIELD(fuel_pre_command, "%d", valve_command) {
+    set_valve(FUEL_PRE, valve_command);
   }
-  READ_FIELD(oxy_command, "%d", oxy_command) {
-    oxy_throttle(oxy_command);
+  READ_FIELD(fuel_main_command, "%d", valve_command) {
+    set_valve(FUEL_MAIN, valve_command);
+  }
+  READ_FIELD(oxy_pre_command, "%d", valve_command) {
+    set_valve(OXY_PRE, valve_command);
+  }
+  READ_FIELD(oxy_main_command, "%d", valve_command) {
+    set_valve(OXY_MAIN, valve_command);
   }
   READ_DEFAULT(data_name, data) {
     Serial.print(F("Invalid data field recieved: "));

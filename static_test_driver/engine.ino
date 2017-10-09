@@ -1,31 +1,19 @@
 
 
-void fuel_throttle(int setting) {
-  Serial.print("Fuel control valve at ");
+void set_valve(valve_t valve, bool setting) {
+  Serial.print(valve_names[valve]);
+  Serial.print(" at ");
   Serial.println(setting);
-  SEND(fuel_target, setting);
-  fuel_target = setting;
-}
-
-void oxy_throttle(int setting) {
-  Serial.print("Oxygen control valve at ");
-  Serial.println(setting);
-  SEND(oxy_target, setting);
-  oxy_target = setting;
-}
-
-// TODO
-void update_throttle() {
-  // TODO: Read fuel and oxygen valve settings from potentiometers
-  fuel_setting = 0;
-  oxy_setting = 0;
-  
-  SEND(fuel_setting, fuel_setting);
-  SEND(oxy_setting, oxy_setting);
-
-  // TODO: write to relays to control throttle valves
+  SEND_NAME(valve_telemetry_ids[valve], setting);
+  digitalWrite(valve_pins[valve], setting);
 }
 
 void fire_ignitor() {
   Serial.println("Firing ignitor");
+  digitalWrite(IGNITOR_PIN, 1);
+}
+
+void reset_ignitor() {
+  Serial.println("Reset ignitor");
+  digitalWrite(IGNITOR_PIN, 0);
 }
