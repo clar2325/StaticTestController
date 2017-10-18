@@ -105,6 +105,8 @@ typedef enum {
   OXY_MAIN
 } valve_t;
 
+bool valve_status[] = {false, false, false, false};
+
 // TODO: Set these
 uint8_t valve_pins[] = {11, 12, 13, 14};
 

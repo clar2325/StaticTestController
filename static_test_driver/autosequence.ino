@@ -51,14 +51,21 @@ long shutdown_time = 0;
 state_t state = STAND_BY;
 
 void start_countdown() {
-  if (sensor_status) {
+  if (!sensor_status) {
+    Serial.println(F("Countdown aborted due to sensor failure"));
+    SET_STATE(STAND_BY) // Set state to signal countdown was aborted
+  }
+  else if (valve_status[FUEL_PRE] ||
+           valve_status[FUEL_MAIN] ||
+           valve_status[OXY_PRE] ||
+           valve_status[OXY_MAIN]) {
+    Serial.println(F("Countdown aborted due to unexpected initial state"));
+    SET_STATE(STAND_BY) // Set state to signal countdown was aborted
+  }
+  else {
     Serial.println(F("Countdown started"));
     SET_STATE(TERMINAL_COUNT)
     start_time = millis();
-  }
-  else {
-    Serial.println(F("Countdown aborted due to sensor failure"));
-    SET_STATE(STAND_BY) // Set state to signal countdown was aborted
   }
 }
 
