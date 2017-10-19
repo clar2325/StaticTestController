@@ -9,12 +9,12 @@ void set_valve(valve_t valve, bool setting) {
   digitalWrite(valve_pins[valve], setting);
 }
 
-void fire_ignitor() {
-  Serial.println("Firing ignitor");
-  digitalWrite(IGNITOR_PIN, 1);
+void fire_igniter() {
+  Serial.println("Firing igniter");
+  digitalWrite(IGNITER_PIN, 1);
 }
 
-void reset_ignitor() {
-  Serial.println("Reset ignitor");
-  digitalWrite(IGNITOR_PIN, 0);
+void reset_igniter() {
+  Serial.println("Reset igniter");
+  digitalWrite(IGNITER_PIN, 0);
 }

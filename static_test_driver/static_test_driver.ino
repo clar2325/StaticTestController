@@ -117,7 +117,7 @@ char data[10] = "";
 char data_name[20] = "";
 
 // TODO: Set this
-#define IGNITOR_PIN 15
+#define IGNITER_PIN 15
 
 void setup() {
   // Initialize LED pins to be outputs
@@ -164,12 +164,13 @@ void setup() {
   for (uint8_t i = 0; i < sizeof(valve_pins); i++) {
     pinMode(valve_pins[i], OUTPUT);
   }
-  pinMode(IGNITOR_PIN, OUTPUT);
+  pinMode(IGNITER_PIN, OUTPUT);
 }
 
 void loop() {
   // Grab force data
   #if CONFIGURATION == MK_2
+  // TODO: This hangs when the load cell amp isn't connected. Figure out a way to check this first.
   force = scale.get_units(); // Force is measured in lbs
 
   #else

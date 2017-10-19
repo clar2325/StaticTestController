@@ -115,7 +115,7 @@ void run_control() {
       // State to wait for ignition after prestage valves are open
       if (run_time >= MAINSTAGE_TIME) {
         SET_STATE(PRESTAGE)
-        fire_ignitor();
+        fire_igniter();
       }
       break;
     case PRESTAGE:
