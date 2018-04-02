@@ -19,80 +19,74 @@
 #include <avr/pgmspace.h>
 
 // LEDs
-#define THERMO1_LED 23
-#define THERMO2_LED 25
-#define THERMO3_LED 27
-#define FORCE_LED 29
-#define PRESSURE_LED 31
-#define STATE_LED 33
-#define STATUS_LED 35
+#define THERMO1_LED 28
+#define THERMO2_LED 30
+#define THERMO3_LED 32
+#define FORCE_LED 42
+#define PRESSURE_FUEL_LED 44
+#define PRESSURE_OX_LED 50 
+#define INLET_TEMP_LED 46 
+#define OUTLET_TEMP_LED 48 
+#define STATE_LED 38 //TODO: Discard STATE_LED code for current sensors revision due to pin conflict. Pin # was changed to satisfy next revision
+#define STATUS_LED 40 //TODO: Discare STATUS_LED code for current sensors revision due to pin conflict. Pin # was changed to satisfy next revision
 
 // Accelerometer
 Adafruit_MMA8451 mma;
 
-// Thermocouple Setup
-#define MAXDO   24
-#define MAXCLK  22
+//Analog Temperature Setup
+#define INLET_TEMP A4
+#define OUTLET_TEMP A5
 
-#define MAXCS1  43
-#define MAXCS2  30
-Adafruit_MAX31855 inlet_thermocouple(MAXCLK, MAXCS1, MAXDO);
-Adafruit_MAX31855 outlet_thermocouple(MAXCLK, MAXCS2, MAXDO);
-
-// Thermocouple and pressure setup for MK_2
-#if CONFIGURATION == MK_2
-#define MAXCS3  32
-Adafruit_MAX31855 chamber_thermocouple(MAXCLK, MAXCS3, MAXDO);
-
+//Pressure Setup
 #define PRESSURE_CALIBRATION_FACTOR 246.58
 #define PRESSURE_OFFSET 118.33
-#define PRESSURE_PIN A1
-
+#define PRESSURE_FUEL A2
+#define PRESSURE_OX A3 
 #define PRESSURE_NUM_HIST_VALS 10
 
-float pressure_hist_vals[PRESSURE_NUM_HIST_VALS];
-int pressure_val_num = 0;
-bool pressure_zero_ready = false;
-float pressure_zero_val = 0;
+float pressure_hist_vals_1[PRESSURE_NUM_HIST_VALS];
+int pressure_val_num_1 = 0;
+bool pressure_zero_ready_1 = false;
+float pressure_zero_val_1 = 0;
+
+float pressure_hist_vals_2[PRESSURE_NUM_HIST_VALS];
+int pressure_val_num_2 = 0;
+bool pressure_zero_ready_2 = false;
+float pressure_zero_val_2 = 0;
+
+// Thermocouple setup for MK_2
+#if CONFIGURATION == MK_2
+#define MAXDO   24
+#define MAXCLK  52
+#define MAXCS1  22
+#define MAXCS2  33
+#define MAXCS3  31
+Adafruit_MAX31855 chamber_thermocouple_1(MAXCLK, MAXCS1, MAXDO);
+Adafruit_MAX31855 chamber_thermocouple_2(MAXCLK, MAXCS2, MAXDO);
+Adafruit_MAX31855 chamber_thermocouple_3(MAXCLK, MAXCS3, MAXDO);
 #endif
 
 // Load cell setup
+#if CONFIGURATION == MK_2
 #define LOAD_CELL_CALIBRATION_FACTOR 20400.0 //This value is obtained using the SparkFun_HX711_Calibration sketch
-#define LOAD_CELL_DOUT 32
+#else
+#define LOAD_CELL_CALIBRATION_FACTOR 1067141
+#endif
+
+#define LOAD_CELL_DOUT 2
 #define LOAD_CELL_CLK  26
 HX711 scale(LOAD_CELL_DOUT, LOAD_CELL_CLK);
 
-// Force plate setup
-#define FORCE_PLATE_PIN A2
-
-//#define HIGH_RANGE
-
-#ifdef HIGH_RANGE
-#define FORCE_PLATE_INTERCEPT -250
-#define FORCE_PLATE_SLOPE 250
-
-#else
-#define FORCE_PLATE_INTERCEPT -1000
-#define FORCE_PLATE_SLOPE 1000
-
-#endif
-
-#define FORCE_PLATE_NUM_HIST_VALS 10
-
-float force_hist_vals[FORCE_PLATE_NUM_HIST_VALS];
-int force_val_num = 0;
-bool force_zero_ready = false;
-float force_zero_val = 0;
-
 // Sensor data
-float chamber_temp, inlet_temp, outlet_temp, pressure, force, x,y,z;
+float chamber_temp_1, chamber_temp_2, chamber_temp_3, pressure_fuel, pressure_ox, force, x,y,z, inlet_temp, outlet_temp;
 
 #define SENSOR_ERROR_LIMIT 5 // Max number of errors in a row before deciding a sensor is faulty
 
-int chamber_temp_error = 0;
-int inlet_temp_error = 0;
-int outlet_temp_error = 0;
-int pressure_error = 0;
+int chamber_temp_1_error = 0;
+int chamber_temp_2_error = 0;
+int chamber_temp_3_error = 0;
+int pressure_fuel_error = 0;
+int pressure_ox_error = 0;
 int force_error = 0;
 int accel_error = 0;
 bool sensor_status = true;
@@ -108,7 +102,7 @@ typedef enum {
 bool valve_status[] = {false, false, false, false};
 
 // TODO: Set these
-uint8_t valve_pins[] = {11, 12, 13, 14};
+uint8_t valve_pins[] = {37, 36, 34, 39};
 
 const char *valve_names[] = {"Fuel prestage", "Fuel mainstage", "Oxygen prestage", "Oxygen mainstage"};
 const char *valve_telemetry_ids[] = {"fuel_pre_setting", "fuel_main_setting", "oxy_pre_setting", "oxy_main_setting"};
@@ -116,7 +110,6 @@ const char *valve_telemetry_ids[] = {"fuel_pre_setting", "fuel_main_setting", "o
 char data[10] = "";
 char data_name[20] = "";
 
-// TODO: Set this
 #define IGNITER_PIN 15
 
 void setup() {
@@ -124,8 +117,11 @@ void setup() {
   pinMode(THERMO1_LED, OUTPUT);
   pinMode(THERMO2_LED, OUTPUT);
   pinMode(THERMO3_LED, OUTPUT);
+  pinMode(INLET_TEMP_LED, OUTPUT);
+  pinMode(OUTLET_TEMP_LED, OUTPUT);
   pinMode(FORCE_LED, OUTPUT);
-  pinMode(PRESSURE_LED, OUTPUT);
+  pinMode(PRESSURE_FUEL_LED, OUTPUT);
+  pinMode(PRESSURE_OX_LED, OUTPUT);
   pinMode(STATE_LED, OUTPUT);
   pinMode(STATUS_LED, OUTPUT);
 
@@ -137,24 +133,23 @@ void setup() {
   // wait for MAX chips to stabilize
   delay(500);
   
-  // Initialize thermocouple and pressure sensor for Mk.2
-  #if CONFIGURATION == MK_2
-  init_thermocouple("Chamber", THERMO3_LED, chamber_thermocouple);
+  //Initialize Pressure Sensors
+  pinMode(PRESSURE_FUEL, INPUT);
+  pinMode(PRESSURE_OX, INPUT);
   
-  pinMode(PRESSURE_PIN, INPUT);
+  //Initialize Analog Temp Sensors
+  pinMode(INLET_TEMP, INPUT);
+  pinMode(OUTLET_TEMP, INPUT);
+  
+  // Initialize thermocouples for Mk.2
+  #if CONFIGURATION == MK_2
+  init_thermocouple("Chamber 1", THERMO1_LED, chamber_thermocouple_1);
+  init_thermocouple("Chamber 2", THERMO2_LED, chamber_thermocouple_2);
+  init_thermocouple("Chamber 3", THERMO3_LED, chamber_thermocouple_3);  
   #endif
   
-  // Initialize thermocouples
-  init_thermocouple("Inlet", THERMO1_LED, inlet_thermocouple);
-  init_thermocouple("Outlet", THERMO2_LED, outlet_thermocouple);
-
-  #if CONFIGURATION == MK_2
   // Calibrate load cell
   scale.set_scale(LOAD_CELL_CALIBRATION_FACTOR); // This value is obtained by using the SparkFun_HX711_Calibration sketch
-  #else
-  // Initialize force plate
-  pinMode(FORCE_PLATE_PIN, INPUT);
-  #endif
   
   // Initialize accelerometer
   Wire.begin();
@@ -169,44 +164,45 @@ void setup() {
 
 void loop() {
   // Grab force data
-  #if CONFIGURATION == MK_2
   // TODO: This hangs when the load cell amp isn't connected. Figure out a way to check this first.
   force = scale.get_units(); // Force is measured in lbs
-
-  #else
-  float count = analogRead(FORCE_PLATE_PIN);
-  float voltage = count / 1023 * 5.0;// convert from count to raw voltage
-  force = FORCE_PLATE_INTERCEPT + voltage * FORCE_PLATE_SLOPE - force_zero_val; //converts voltage to sensor reading
-
-  force_hist_vals[force_val_num] = force;
-  force_val_num++;
-  if (force_val_num >= FORCE_PLATE_NUM_HIST_VALS) {
-    force_val_num = 0;
-    force_zero_ready = true;
-  }
-  #endif
-  // TODO: Error checking
+  
+  // TODO: Error checking for load cell?
   
   // Grab thermocouple data for Mk.2
   #if CONFIGURATION == MK_2
-  chamber_temp = read_thermocouple("Chamber", THERMO3_LED, chamber_thermocouple, chamber_temp_error);
-  
-  // Grab pressure data
-  pressure = (analogRead(PRESSURE_PIN) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val); // Pressure is measured in PSIG
-  // TODO: Error checking
-
-  // Update pressure tare data
-  pressure_hist_vals[pressure_val_num] = pressure;
-  pressure_val_num++;
-  if (pressure_val_num >= PRESSURE_NUM_HIST_VALS) {
-    pressure_val_num = 0;
-    pressure_zero_ready = true;
-  }
+  chamber_temp_1 = read_thermocouple("Chamber 1", THERMO1_LED, chamber_thermocouple_1, chamber_temp_error_1);
+  chamber_temp_2 = read_thermocouple("Chamber 2", THERMO2_LED, chamber_thermocouple_2, chamber_temp_error_2);
+  chamber_temp_3 = read_thermocouple("Chamber 3", THERMO3_LED, chamber_thermocouple_3, chamber_temp_error_3);
   #endif
   
-  // Grab thermocouple data
-  inlet_temp = read_thermocouple("Inlet", THERMO1_LED, inlet_thermocouple, inlet_temp_error);
-  outlet_temp = read_thermocouple("Outlet", THERMO2_LED, outlet_thermocouple, outlet_temp_error);
+  
+  // Grab pressure data
+  pressure_fuel = (analogRead(PRESSURE_FUEL) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val_1); // Pressure is measured in PSIG
+  pressure_fuel = (analogRead(PRESSURE_OX) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val_2); // Pressure is measured in PSIG
+  // TODO: Error checking
+
+  // Update pressure fuel tare data
+  pressure_hist_vals_1[pressure_val_num_1] = pressure_fuel;
+  pressure_val_num_1++;
+  if (pressure_val_num_1 >= PRESSURE_NUM_HIST_VALS) {
+    pressure_val_num_1 = 0;
+    pressure_zero_ready_1 = true;
+  }
+  
+   // Update pressure ox tare data
+  pressure_hist_vals_2[pressure_val_num_2] = pressure_ox;
+  pressure_val_num_2++;
+  if (pressure_val_num_2 >= PRESSURE_NUM_HIST_VALS) {
+    pressure_val_num_2 = 0;
+    pressure_zero_ready_2 = true;
+  }
+  
+  // Grab analog temperature data
+  inlet_temp = (analogRead(INLET_TEMP) * 5.0 / 1024.0 - 0.5) * 100 ;
+  outlet_temp = (analogRead(OUTLET_TEMP) * 5.0 / 1024.0 - 0.5) * 100 ;
+  
+  //TODO: Add error checking for temp?
   
   // Grab accelerometer data (acceleration is measured in m/s^2)
   sensors_vec_t accel = read_accelerometer(mma, accel_error);
@@ -223,9 +219,12 @@ void loop() {
   SEND_GROUP_ITEM(z)
   SEND_ITEM(outlet_temperature, outlet_temp)
   SEND_ITEM(inlet_temperature, inlet_temp)
+  SEND_ITEM(pressure_fuel, pressure_fuel)
+  SEND_ITEM(pressure_oxidizer, pressure_ox)   
   #if CONFIGURATION == MK_2
-  SEND_ITEM(chamber_temperature, chamber_temp)
-  SEND_ITEM(pressure,pressure)
+  SEND_ITEM(chamber_temperature_1, chamber_temp_1)
+  SEND_ITEM(chamber_temperature_2, chamber_temp_2)
+  SEND_ITEM(chamber_temperature_3, chamber_temp_3)
   #endif
   SEND_ITEM(sensor_status, sensor_status)
   END_SEND
@@ -235,40 +234,40 @@ void loop() {
   
   BEGIN_READ
   READ_FLAG(zero_force) {
-    #if CONFIGURATION == MK_2
     Serial.println(F("Zeroing load cell"));
     scale.tare(); // Load Cell, Assuming there is no weight on the scale, reset to 0
-
-    #else
-    if (force_zero_ready) {
-      Serial.println(F("Zeroing force plate"));
-      force_zero_ready = false;
-      force_zero_val = 0;
-      for (int i = 0; i < FORCE_PLATE_NUM_HIST_VALS; i++)
-        force_zero_val += force_hist_vals[i];
-      force_zero_val /= FORCE_PLATE_NUM_HIST_VALS;
-    }
-    else {
-      Serial.println(F("Force zero value not ready"));
-    }
-
-    #endif
   }
-  #if CONFIGURATION == MK_2
-  READ_FLAG(zero_pressure) {
-    if (pressure_zero_ready) {
-      Serial.println(F("Zeroing pressure"));
-      pressure_zero_ready = false;
-      pressure_zero_val = 0;
+  
+  //TODO: Update flag names to match the following code
+  READ_FLAG(zero_pressure_1) {
+    if (pressure_zero_ready_1) {
+      Serial.println(F("Zeroing fuel pressure"));
+      pressure_zero_ready_1 = false;
+      pressure_zero_val_1 = 0;
       for (int i = 0; i < PRESSURE_NUM_HIST_VALS; i++)
-        pressure_zero_val += pressure_hist_vals[i];
-      pressure_zero_val /= PRESSURE_NUM_HIST_VALS;
+        pressure_zero_val_1 += pressure_hist_vals_1[i];
+      pressure_zero_val_1 /= PRESSURE_NUM_HIST_VALS;
     }
     else {
-      Serial.println(F("Pressure zero value not ready"));
+      Serial.println(F("Fuel pressure zero value not ready"));
     }
   }
-  #endif
+  READ_FLAG(zero_pressure_2) {
+    if (pressure_zero_ready_2) {
+      Serial.println(F("Zeroing oxidizer pressure"));
+      pressure_zero_ready_2 = false;
+      pressure_zero_val_2 = 0;
+      for (int i = 0; i < PRESSURE_NUM_HIST_VALS; i++)
+        pressure_zero_val_2 += pressure_hist_vals_2[i];
+      pressure_zero_val_2 /= PRESSURE_NUM_HIST_VALS;
+    }
+    else {
+      Serial.println(F("Oxidizer pressure zero value not ready"));
+    }
+  }
+  
+  //TODO: Tare for temperature?
+  
   READ_FLAG(reset) {
     Serial.println(F("Resetting board"));
     asm volatile("  jmp 0"); // Perform a software reset of the board, reinitializing sensors
