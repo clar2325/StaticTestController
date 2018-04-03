@@ -205,9 +205,9 @@ void loop() {
   SEND_ITEM(pressure_fuel, pressure_fuel)
   SEND_ITEM(pressure_oxidizer, pressure_ox)   
   #if CONFIGURATION == MK_2
-  SEND_ITEM(chamber_temperature_1, chamber_temp_1)
-  SEND_ITEM(chamber_temperature_2, chamber_temp_2)
-  SEND_ITEM(chamber_temperature_3, chamber_temp_3)
+  SEND_ITEM(chamber_temperature_1, chamber_temp[0])
+  SEND_ITEM(chamber_temperature_2, chamber_temp[2])
+  SEND_ITEM(chamber_temperature_3, chamber_temp[3])
   #endif
   SEND_ITEM(sensor_status, sensor_status)
   END_SEND
