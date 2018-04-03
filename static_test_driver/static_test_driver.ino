@@ -230,8 +230,7 @@ void loop() {
   READ_FLAG(zero_pressure_fuel) {
     if (pressure_zero_ready) {
       Serial.print(F("Zeroing fuel pressure"));
-      pressure_zero_val[0] = 0;
-      mean(&pressure_hist_vals[0][0], PRESSURE_NUM_HIST_VALS);
+      pressure_zero_val[0] = mean(pressure_hist_vals[0], PRESSURE_NUM_HIST_VALS);
     }
     else
       Serial.println(F("Fuel pressure zero value not ready"));
@@ -240,9 +239,8 @@ void loop() {
   READ_FLAG(zero_pressure_ox) {
     if (pressure_zero_ready) {
       Serial.print(F("Zeroing oxidizer pressure"));
-      pressure_zero_val[1] = 0;
-      pressure_zero_ready = 0;
-      mean(&pressure_hist_vals[1][0], PRESSURE_NUM_HIST_VALS);
+      pressure_zero_val[1] = mean(pressure_hist_vals[1], PRESSURE_NUM_HIST_VALS);
+      pressure_zero_ready = false;
     }
     else
       Serial.println(F("Oxidizer pressure zero value not ready"));
