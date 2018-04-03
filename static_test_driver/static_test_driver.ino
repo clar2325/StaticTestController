@@ -48,9 +48,9 @@ Adafruit_MMA8451 mma;
 
 //Pressure sensor 0 = Fuel, Pressure sensor 1 = Oxidizer
 float pressure_hist_vals [NUMBER_OF_PRESSURE_SENSORS][PRESSURE_NUM_HIST_VALS];
-int pressure_val_num [NUMBER_OF_PRESSURE_SENSORS] = {0,0};
-bool pressure_zero_ready [NUMBER_OF_PRESSURE_SENSORS] = {false, false};
-float pressure_zero_val[NUMBER_OF_PRESSURE_SENSORS] = {0,0};
+int pressure_val_num = 0;
+bool pressure_zero_ready = false;
+float pressure_zero_val[NUMBER_OF_PRESSURE_SENSORS]= {0,0};
 
 // Thermocouple setup for MK_2
 #if CONFIGURATION == MK_2
@@ -96,7 +96,6 @@ typedef enum {
 
 bool valve_status[] = {false, false, false, false};
 
-// TODO: Set these
 uint8_t valve_pins[] = {37, 36, 34, 39};
 
 const char *valve_names[] = {"Fuel prestage", "Fuel mainstage", "Oxygen prestage", "Oxygen mainstage"};
@@ -178,8 +177,14 @@ void loop() {
   // TODO: Error checking
 
   // Update pressure tare data
-  tare_pressure (PRESSURE_FUEL);
-  tare_pressure (PRESSURE_OX);
+  pressure_hist_vals[0][pressure_val_num] = pressure_fuel;
+  pressure_hist_vals[1][pressure_val_num] = pressure_ox;
+  
+  pressure_val_num++;
+  if (pressure_val_num >= PRESSURE_NUM_HIST_VALS) {
+    pressure_val_num = 0;
+    pressure_zero_ready = true;
+  }
   
   // Grab analog temperature data
   inlet_temp = (analogRead(INLET_TEMP) * 5.0 / 1024.0 - 0.5) * 100 ;
@@ -221,12 +226,26 @@ void loop() {
     scale.tare(); // Load Cell, Assuming there is no weight on the scale, reset to 0
   }
   
-  //TODO: Update flag names to match the following code
+  //TODO: Update flag names to match the following code 
   READ_FLAG(zero_pressure_fuel) {
-    zero_pressure (PRESSURE_FUEL, "fuel");
+    if (pressure_zero_ready) {
+      Serial.print(F("Zeroing fuel pressure"));
+      pressure_zero_val[0] = 0;
+      mean(&pressure_hist_vals[0][0], PRESSURE_NUM_HIST_VALS);
+    }
+    else
+      Serial.println(F("Fuel pressure zero value not ready"));
   }
+  
   READ_FLAG(zero_pressure_ox) {
-    zero_pressure (PRESSURE_OX, "oxidizer");
+    if (pressure_zero_ready) {
+      Serial.print(F("Zeroing oxidizer pressure"));
+      pressure_zero_val[1] = 0;
+      pressure_zero_ready = 0;
+      mean(&pressure_hist_vals[1][0], PRESSURE_NUM_HIST_VALS);
+    }
+    else
+      Serial.println(F("Oxidizer pressure zero value not ready"));
   }
   
   READ_FLAG(reset) {
