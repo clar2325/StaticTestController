@@ -2,7 +2,7 @@ float mean (const float *data, unsigned int size) {
   float result;
   for (int i = 0; i < size; i++)
       result += data[i];
-  return result /= size;
+  return result / size;
 }
 
 void init_thermocouple(const char *sensor_name, int led, Adafruit_MAX31855 &thermocouple) {
