@@ -43,16 +43,14 @@ Adafruit_MMA8451 mma;
 #define PRESSURE_FUEL A2
 #define PRESSURE_OX A3 
 #define PRESSURE_NUM_HIST_VALS 10
+#define NUMBER_OF_PRESSURE_SENSORS 2
+#define NUMBER_OF_THERMOCOUPLES 3
 
-float pressure_hist_vals_1[PRESSURE_NUM_HIST_VALS];
-int pressure_val_num_1 = 0;
-bool pressure_zero_ready_1 = false;
-float pressure_zero_val_1 = 0;
-
-float pressure_hist_vals_2[PRESSURE_NUM_HIST_VALS];
-int pressure_val_num_2 = 0;
-bool pressure_zero_ready_2 = false;
-float pressure_zero_val_2 = 0;
+//Pressure sensor 0 = Fuel, Pressure sensor 1 = Oxidizer
+float pressure_hist_vals [NUMBER_OF_PRESSURE_SENSORS][PRESSURE_NUM_HIST_VALS];
+int pressure_val_num [NUMBER_OF_PRESSURE_SENSORS] = {0,0};
+bool pressure_zero_ready [NUMBER_OF_PRESSURE_SENSORS] = {false, false};
+float pressure_zero_val[NUMBER_OF_PRESSURE_SENSORS] = {0,0};
 
 // Thermocouple setup for MK_2
 #if CONFIGURATION == MK_2
@@ -78,15 +76,12 @@ Adafruit_MAX31855 chamber_thermocouple_3(MAXCLK, MAXCS3, MAXDO);
 HX711 scale(LOAD_CELL_DOUT, LOAD_CELL_CLK);
 
 // Sensor data
-float chamber_temp_1, chamber_temp_2, chamber_temp_3, pressure_fuel, pressure_ox, force, x,y,z, inlet_temp, outlet_temp;
+float chamber_temp[NUMBER_OF_THERMOCOUPLES], pressure_fuel, pressure_ox, force, x,y,z, inlet_temp, outlet_temp;
 
 #define SENSOR_ERROR_LIMIT 5 // Max number of errors in a row before deciding a sensor is faulty
 
-int chamber_temp_1_error = 0;
-int chamber_temp_2_error = 0;
-int chamber_temp_3_error = 0;
-int pressure_fuel_error = 0;
-int pressure_ox_error = 0;
+int chamber_temp_error[NUMBER_OF_THERMOCOUPLES] = {0,0,0};
+int pressure_error[NUMBER_OF_PRESSURE_SENSORS] = {0,0};
 int force_error = 0;
 int accel_error = 0;
 bool sensor_status = true;
@@ -171,32 +166,20 @@ void loop() {
   
   // Grab thermocouple data for Mk.2
   #if CONFIGURATION == MK_2
-  chamber_temp_1 = read_thermocouple("Chamber 1", THERMO1_LED, chamber_thermocouple_1, chamber_temp_error_1);
-  chamber_temp_2 = read_thermocouple("Chamber 2", THERMO2_LED, chamber_thermocouple_2, chamber_temp_error_2);
-  chamber_temp_3 = read_thermocouple("Chamber 3", THERMO3_LED, chamber_thermocouple_3, chamber_temp_error_3);
+  chamber_temp[0] = read_thermocouple("Chamber 1", THERMO1_LED, chamber_thermocouple_1, chamber_temp_error[0]);
+  chamber_temp[1] = read_thermocouple("Chamber 2", THERMO2_LED, chamber_thermocouple_2, chamber_temp_error[1]);
+  chamber_temp[2] = read_thermocouple("Chamber 3", THERMO3_LED, chamber_thermocouple_3, chamber_temp_error[2]);
   #endif
   
   
   // Grab pressure data
   pressure_fuel = (analogRead(PRESSURE_FUEL) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val_1); // Pressure is measured in PSIG
-  pressure_fuel = (analogRead(PRESSURE_OX) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val_2); // Pressure is measured in PSIG
+  pressure_ox = (analogRead(PRESSURE_OX) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val_2); // Pressure is measured in PSIG
   // TODO: Error checking
 
-  // Update pressure fuel tare data
-  pressure_hist_vals_1[pressure_val_num_1] = pressure_fuel;
-  pressure_val_num_1++;
-  if (pressure_val_num_1 >= PRESSURE_NUM_HIST_VALS) {
-    pressure_val_num_1 = 0;
-    pressure_zero_ready_1 = true;
-  }
-  
-   // Update pressure ox tare data
-  pressure_hist_vals_2[pressure_val_num_2] = pressure_ox;
-  pressure_val_num_2++;
-  if (pressure_val_num_2 >= PRESSURE_NUM_HIST_VALS) {
-    pressure_val_num_2 = 0;
-    pressure_zero_ready_2 = true;
-  }
+  // Update pressure tare data
+  tare_pressure (PRESSURE_FUEL);
+  tare_pressure (PRESSURE_OX);
   
   // Grab analog temperature data
   inlet_temp = (analogRead(INLET_TEMP) * 5.0 / 1024.0 - 0.5) * 100 ;
@@ -239,34 +222,12 @@ void loop() {
   }
   
   //TODO: Update flag names to match the following code
-  READ_FLAG(zero_pressure_1) {
-    if (pressure_zero_ready_1) {
-      Serial.println(F("Zeroing fuel pressure"));
-      pressure_zero_ready_1 = false;
-      pressure_zero_val_1 = 0;
-      for (int i = 0; i < PRESSURE_NUM_HIST_VALS; i++)
-        pressure_zero_val_1 += pressure_hist_vals_1[i];
-      pressure_zero_val_1 /= PRESSURE_NUM_HIST_VALS;
-    }
-    else {
-      Serial.println(F("Fuel pressure zero value not ready"));
-    }
+  READ_FLAG(zero_pressure_fuel) {
+    zero_pressure (PRESSURE_FUEL, "fuel");
   }
-  READ_FLAG(zero_pressure_2) {
-    if (pressure_zero_ready_2) {
-      Serial.println(F("Zeroing oxidizer pressure"));
-      pressure_zero_ready_2 = false;
-      pressure_zero_val_2 = 0;
-      for (int i = 0; i < PRESSURE_NUM_HIST_VALS; i++)
-        pressure_zero_val_2 += pressure_hist_vals_2[i];
-      pressure_zero_val_2 /= PRESSURE_NUM_HIST_VALS;
-    }
-    else {
-      Serial.println(F("Oxidizer pressure zero value not ready"));
-    }
+  READ_FLAG(zero_pressure_ox) {
+    zero_pressure (PRESSURE_OX, "oxidizer");
   }
-  
-  //TODO: Tare for temperature?
   
   READ_FLAG(reset) {
     Serial.println(F("Resetting board"));
