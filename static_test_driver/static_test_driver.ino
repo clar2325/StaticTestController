@@ -33,11 +33,11 @@
 // Accelerometer
 Adafruit_MMA8451 mma;
 
-//Analog Temperature Setup
+// Analog Temperature Setup
 #define INLET_TEMP A4
 #define OUTLET_TEMP A5
 
-//Pressure Setup
+// Pressure Setup
 #define PRESSURE_CALIBRATION_FACTOR 246.58
 #define PRESSURE_OFFSET 118.33
 #define PRESSURE_FUEL A2
@@ -46,7 +46,7 @@ Adafruit_MMA8451 mma;
 #define NUMBER_OF_PRESSURE_SENSORS 2
 #define NUMBER_OF_THERMOCOUPLES 3
 
-//Pressure sensor 0 = Fuel, Pressure sensor 1 = Oxidizer
+// Pressure sensor 0 = Fuel, Pressure sensor 1 = Oxidizer
 float pressure_hist_vals [NUMBER_OF_PRESSURE_SENSORS][PRESSURE_NUM_HIST_VALS];
 int pressure_val_num = 0;
 bool pressure_zero_ready = false;
@@ -172,8 +172,8 @@ void loop() {
   
   
   // Grab pressure data
-  pressure_fuel = (analogRead(PRESSURE_FUEL) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val_1); // Pressure is measured in PSIG
-  pressure_ox = (analogRead(PRESSURE_OX) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val_2); // Pressure is measured in PSIG
+  pressure_fuel = (analogRead(PRESSURE_FUEL) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val[0]); // Pressure is measured in PSIG
+  pressure_ox = (analogRead(PRESSURE_OX) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val[1]); // Pressure is measured in PSIG
   // TODO: Error checking
 
   // Update pressure tare data
