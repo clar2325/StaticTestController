@@ -210,8 +210,8 @@ void loop() {
   SEND_GROUP_ITEM(z)
   SEND_ITEM(outlet_temperature, outlet_temp)
   SEND_ITEM(inlet_temperature, inlet_temp)
-  //SEND_ITEM(pressure_fuel, pressure_fuel)
-  //SEND_ITEM(pressure_oxidizer, pressure_ox)   
+  SEND_ITEM(pressure_fuel, pressure_fuel)
+  SEND_ITEM(pressure_oxidizer, pressure_ox)   
   #if CONFIGURATION == MK_2
   SEND_ITEM(chamber_temperature_1, chamber_temp[0])
   SEND_ITEM(chamber_temperature_2, chamber_temp[2])
@@ -260,16 +260,16 @@ void loop() {
     abort_autosequence();
   }
   READ_FIELD(fuel_pre_command, "%d", valve_command) {
-    //set_valve(FUEL_PRE, valve_command);
+    set_valve(FUEL_PRE, valve_command);
   }
   READ_FIELD(fuel_main_command, "%d", valve_command) {
-    //set_valve(FUEL_MAIN, valve_command);
+    set_valve(FUEL_MAIN, valve_command);
   }
   READ_FIELD(oxy_pre_command, "%d", valve_command) {
-    //set_valve(OXY_PRE, valve_command);
+    set_valve(OXY_PRE, valve_command);
   }
   READ_FIELD(oxy_main_command, "%d", valve_command) {
-    //set_valve(OXY_MAIN, valve_command);
+    set_valve(OXY_MAIN, valve_command);
   }
   READ_DEFAULT(data_name, data) {
     Serial.print(F("Invalid data field recieved: "));
