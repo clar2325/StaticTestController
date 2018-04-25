@@ -50,7 +50,7 @@ Adafruit_MMA8451 mma;
 float pressure_hist_vals [NUMBER_OF_PRESSURE_SENSORS][PRESSURE_NUM_HIST_VALS];
 int pressure_val_num = 0;
 bool pressure_zero_ready = false;
-float pressure_zero_val[NUMBER_OF_PRESSURE_SENSORS]= {0,0};
+float pressure_zero_val[NUMBER_OF_PRESSURE_SENSORS] = {0,0};
 
 // Thermocouple setup for MK_2
 #if CONFIGURATION == MK_2
@@ -90,8 +90,8 @@ bool sensor_status = true;
 typedef enum {
   FUEL_PRE,
   FUEL_MAIN,
-  OXY_PRE,
-  OXY_MAIN
+  OX_PRE,
+  OX_MAIN
 } valve_t;
 
 bool valve_status[] = {false, false, false, false};
@@ -99,7 +99,7 @@ bool valve_status[] = {false, false, false, false};
 uint8_t valve_pins[] = {37, 36, 34, 39};
 
 const char *valve_names[] = {"Fuel prestage", "Fuel mainstage", "Oxygen prestage", "Oxygen mainstage"};
-const char *valve_telemetry_ids[] = {"fuel_pre_setting", "fuel_main_setting", "oxy_pre_setting", "oxy_main_setting"};
+const char *valve_telemetry_ids[] = {"fuel_pre_setting", "fuel_main_setting", "ox_pre_setting", "ox_main_setting"};
 
 char data[10] = "";
 char data_name[20] = "";
@@ -170,15 +170,18 @@ void loop() {
   chamber_temp[2] = read_thermocouple("Chamber 3", THERMO3_LED, chamber_thermocouple_3, chamber_temp_error[2]);
   #endif
   
-  
   // Grab pressure data
-  pressure_fuel = (analogRead(PRESSURE_FUEL) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val[0]); // Pressure is measured in PSIG
-  pressure_ox = (analogRead(PRESSURE_OX) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val[1]); // Pressure is measured in PSIG
+  pressure_fuel = (analogRead(PRESSURE_FUEL) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET; // Pressure is measured in PSIG
+  pressure_ox = (analogRead(PRESSURE_OX) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET; // Pressure is measured in PSIG
   // TODO: Error checking
-
+  
   // Update pressure tare data
   pressure_hist_vals[0][pressure_val_num] = pressure_fuel;
   pressure_hist_vals[1][pressure_val_num] = pressure_ox;
+  
+  // Tare pressures
+  pressure_fuel -= pressure_zero_val[0];
+  pressure_ox -= pressure_zero_val[1];
   
   pressure_val_num++;
   if (pressure_val_num >= PRESSURE_NUM_HIST_VALS) {
@@ -207,8 +210,8 @@ void loop() {
   SEND_GROUP_ITEM(z)
   SEND_ITEM(outlet_temperature, outlet_temp)
   SEND_ITEM(inlet_temperature, inlet_temp)
-  SEND_ITEM(pressure_fuel, pressure_fuel)
-  SEND_ITEM(pressure_oxidizer, pressure_ox)   
+  SEND_ITEM(fuel_pressure, pressure_fuel)
+  SEND_ITEM(ox_pressure, pressure_ox)   
   #if CONFIGURATION == MK_2
   SEND_ITEM(chamber_temperature_1, chamber_temp[0])
   SEND_ITEM(chamber_temperature_2, chamber_temp[2])
@@ -226,24 +229,17 @@ void loop() {
     scale.tare(); // Load Cell, Assuming there is no weight on the scale, reset to 0
   }
   
-  //TODO: Update flag names to match the following code 
-  READ_FLAG(zero_pressure_fuel) {
+  READ_FLAG(zero_pressure) {
     if (pressure_zero_ready) {
-      Serial.print(F("Zeroing fuel pressure"));
+      Serial.println(F("Zeroing fuel pressure"));
       pressure_zero_val[0] = mean(pressure_hist_vals[0], PRESSURE_NUM_HIST_VALS);
-    }
-    else
-      Serial.println(F("Fuel pressure zero value not ready"));
-  }
-  
-  READ_FLAG(zero_pressure_ox) {
-    if (pressure_zero_ready) {
-      Serial.print(F("Zeroing oxidizer pressure"));
+      Serial.println(F("Zeroing oxidizer pressure"));
       pressure_zero_val[1] = mean(pressure_hist_vals[1], PRESSURE_NUM_HIST_VALS);
       pressure_zero_ready = false;
+      pressure_val_num = 0;
     }
     else
-      Serial.println(F("Oxidizer pressure zero value not ready"));
+      Serial.println(F("Pressure zero values not ready"));
   }
   
   READ_FLAG(reset) {
@@ -262,11 +258,11 @@ void loop() {
   READ_FIELD(fuel_main_command, "%d", valve_command) {
     set_valve(FUEL_MAIN, valve_command);
   }
-  READ_FIELD(oxy_pre_command, "%d", valve_command) {
-    set_valve(OXY_PRE, valve_command);
+  READ_FIELD(ox_pre_command, "%d", valve_command) {
+    set_valve(OX_PRE, valve_command);
   }
-  READ_FIELD(oxy_main_command, "%d", valve_command) {
-    set_valve(OXY_MAIN, valve_command);
+  READ_FIELD(ox_main_command, "%d", valve_command) {
+    set_valve(OX_MAIN, valve_command);
   }
   READ_DEFAULT(data_name, data) {
     Serial.print(F("Invalid data field recieved: "));
