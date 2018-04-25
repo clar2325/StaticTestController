@@ -87,16 +87,15 @@ int accel_error = 0;
 bool sensor_status = true;
 
 // Engine control setup
-typedef enum {
-  FUEL_PRE,
-  FUEL_MAIN,
-  OX_PRE,
-  OX_MAIN
-} valve_t;
+#define FUEL_PRE    0
+#define FUEL_MAIN   1
+#define OXY_PRE     2
+#define OXY_MAIN    3
+//keeping these as defines not enums for now since that's how they were tested
 
 bool valve_status[] = {false, false, false, false};
 
-uint8_t valve_pins[] = {37, 36, 34, 39};
+uint8_t valve_pins[] = {37, 36, 39, 34};
 
 const char *valve_names[] = {"Fuel prestage", "Fuel mainstage", "Oxygen prestage", "Oxygen mainstage"};
 const char *valve_telemetry_ids[] = {"fuel_pre_setting", "fuel_main_setting", "ox_pre_setting", "ox_main_setting"};
@@ -154,6 +153,7 @@ void setup() {
     pinMode(valve_pins[i], OUTPUT);
   }
   pinMode(IGNITER_PIN, OUTPUT);
+  Serial.println("Setup Complete");
 }
 
 void loop() {
@@ -168,6 +168,7 @@ void loop() {
   chamber_temp[0] = read_thermocouple("Chamber 1", THERMO1_LED, chamber_thermocouple_1, chamber_temp_error[0]);
   chamber_temp[1] = read_thermocouple("Chamber 2", THERMO2_LED, chamber_thermocouple_2, chamber_temp_error[1]);
   chamber_temp[2] = read_thermocouple("Chamber 3", THERMO3_LED, chamber_thermocouple_3, chamber_temp_error[2]);
+  //Serial.println("Collected Thermocouple Data");
   #endif
   
   // Grab pressure data
@@ -182,6 +183,7 @@ void loop() {
   // Tare pressures
   pressure_fuel -= pressure_zero_val[0];
   pressure_ox -= pressure_zero_val[1];
+
   
   pressure_val_num++;
   if (pressure_val_num >= PRESSURE_NUM_HIST_VALS) {
@@ -196,9 +198,10 @@ void loop() {
   //TODO: Add error checking for temp?
   
   // Grab accelerometer data (acceleration is measured in m/s^2)
-  sensors_vec_t accel = read_accelerometer(mma, accel_error);
-  x=accel.x;  y=accel.y;  z=accel.z;
-
+  //sensors_vec_t accel = read_accelerometer(mma, accel_error);
+  //x=accel.x;  y=accel.y;  z=accel.z;
+  //commented out for now, accelermometer data being buggy
+  
   // Run autonomous control
   run_control();
 

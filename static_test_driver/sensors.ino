@@ -56,7 +56,9 @@ void init_accelerometer(Adafruit_MMA8451 &mma, int led) {
 }
 
 sensors_vec_t read_accelerometer(Adafruit_MMA8451 &mma, int &error) {
+  //Serial.println("In Accelerometer Function");
   sensors_event_t event;
   mma.getEvent(&event); // TODO: Error checking
+  //Serial.println("Got event");
   return event.acceleration;
 }
