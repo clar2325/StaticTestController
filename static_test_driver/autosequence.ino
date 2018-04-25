@@ -1,5 +1,5 @@
 // Timing
-#define PRESTAGE_PREP_TIME -1000 // Time at which to open the prestage valves
+#define PRESTAGE_PREP_TIME -500 // Time at which to open the prestage valves
 #define PRESTAGE_TIME      0
 #define MAINSTAGE_TIME     2000
 #define THRUST_CHECK_TIME  4000  // Time at which to start checking the engine is producing thrust, etc.
@@ -9,11 +9,10 @@
 #define RUN_TIME           10000 // 10 sec
 #define COOLDOWN_TIME      10000 // 10 sec
 #else
-#define COUNTDOWN_DURATION 10000 //60000 // 1 min
-#define END_CHECK_TIME     5000 // 5 sec
+#define COUNTDOWN_DURATION 60000 // 1 min
 #define RUN_TIME           12000 // 12 sec
 #define OX_LEADTIME        500 // 0.5 sec time for oxidizer to close before fuel
-#define COOLDOWN_TIME      10000 //60000 * 5 // 5 mins
+#define COOLDOWN_TIME      60000 * 5 // 5 mins
 #endif
 
 // Limits
@@ -89,7 +88,7 @@ void abort_autosequence() {
       SET_STATE(COOL_DOWN)
       set_valve(OXY_PRE, 0);
       set_valve(OXY_MAIN, 0);
-      delay(200);
+      delay(200); //closes the oxygen valves slightly before the fuel valves like in a normal shutdown but with a delay function instead because who cares about 200ms of blocking code in an abort procedure?
       set_valve(FUEL_PRE, 0);
       set_valve(FUEL_MAIN, 0);
       shutdown_time = millis();
@@ -150,6 +149,7 @@ void run_control() {
         abort_autosequence();
       }
 
+      //this checks 0.5 sec before runtime is up that the oxygen valves are open and closes them, and doesn't send more commands to close them once they are closed.
       if (run_time >= RUN_TIME-OX_LEADTIME && valve_status[OXY_PRE] == 1 && valve_status[OXY_MAIN] == 1) {
         set_valve(OXY_PRE, 0);
         set_valve(OXY_MAIN, 0);
