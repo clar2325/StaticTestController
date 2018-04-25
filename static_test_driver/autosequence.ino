@@ -1,17 +1,19 @@
 // Timing
 #define PRESTAGE_PREP_TIME -1000 // Time at which to open the prestage valves
 #define PRESTAGE_TIME      0
-#define MAINSTAGE_TIME     1000
-#define STARTUP_TIME       3000  // Time at which to start checking the engine is producing thrust, etc.
+#define MAINSTAGE_TIME     2000
+#define THRUST_CHECK_TIME  4000  // Time at which to start checking the engine is producing thrust, etc.
 
 #if CONFIGURATION == DEMO
 #define COUNTDOWN_DURATION 10000 // 10 sec
 #define RUN_TIME           10000 // 10 sec
 #define COOLDOWN_TIME      10000 // 10 sec
 #else
-#define COUNTDOWN_DURATION 60000 // 1 min
-#define RUN_TIME           30000 // 30 sec
-#define COOLDOWN_TIME      60000 * 5 // 5 mins
+#define COUNTDOWN_DURATION 10000 //60000 // 1 min
+#define END_CHECK_TIME     5000 // 5 sec
+#define RUN_TIME           12000 // 12 sec
+#define OX_LEADTIME        500 // 0.5 sec time for oxidizer to close before fuel
+#define COOLDOWN_TIME      10000 //60000 * 5 // 5 mins
 #endif
 
 // Limits
@@ -20,9 +22,9 @@
 
 // Min thrust that must be reached to avoid triggering a no-ignition shutdown
 #if CONFIGURATION == DEMO
-#define MIN_THRUST 100
+#define MIN_THRUST 50
 #elif CONFIGURATION == MK_1
-#define MIN_THRUST 100
+#define MIN_THRUST 2
 #elif CONFIGURATION == MK_2
 #define MIN_THRUST 1000
 #endif
@@ -85,10 +87,11 @@ void abort_autosequence() {
     case PRESTAGE:
     case MAINSTAGE:
       SET_STATE(COOL_DOWN)
-      set_valve(FUEL_PRE, 0);
-      set_valve(FUEL_MAIN, 0);
       set_valve(OXY_PRE, 0);
       set_valve(OXY_MAIN, 0);
+      delay(200);
+      set_valve(FUEL_PRE, 0);
+      set_valve(FUEL_MAIN, 0);
       shutdown_time = millis();
       break;
   }
@@ -139,20 +142,23 @@ void run_control() {
       }
       // Check that the engine is producing thrust once mainstage valves are fully open
 #if CONFIGURATION != DEMO
-      else if (run_time >= STARTUP_TIME && force < MIN_THRUST) {
+      else if (run_time >= THRUST_CHECK_TIME && force < MIN_THRUST) {
 #else
-      else if (force < MIN_THRUST) {
+      else if (run_time >= THRUST_CHECK_TIME && force < MIN_THRUST) {
 #endif
         Serial.println(F("Thrust below critical level"));
         abort_autosequence();
       }
 
-      if (run_time >= RUN_TIME) {
+      if (run_time >= RUN_TIME-OX_LEADTIME && valve_status[OXY_PRE] == 1 && valve_status[OXY_MAIN] == 1) {
+        set_valve(OXY_PRE, 0);
+        set_valve(OXY_MAIN, 0);
+      }
+
+      if (run_time >= RUN_TIME){
         SET_STATE(COOL_DOWN)
         set_valve(FUEL_PRE, 0);
         set_valve(FUEL_MAIN, 0);
-        set_valve(OXY_PRE, 0);
-        set_valve(OXY_MAIN, 0);
         shutdown_time = millis();
       }
       break;

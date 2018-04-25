@@ -1,6 +1,6 @@
 
 
-void set_valve(valve_t valve, bool setting) {
+void set_valve(int valve, bool setting) {
   Serial.print(valve_names[valve]);
   Serial.print(" at ");
   Serial.println(setting);

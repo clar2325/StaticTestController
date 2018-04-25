@@ -33,11 +33,11 @@
 // Accelerometer
 Adafruit_MMA8451 mma;
 
-// Analog Temperature Setup
+//Analog Temperature Setup
 #define INLET_TEMP A4
 #define OUTLET_TEMP A5
 
-// Pressure Setup
+//Pressure Setup
 #define PRESSURE_CALIBRATION_FACTOR 246.58
 #define PRESSURE_OFFSET 118.33
 #define PRESSURE_FUEL A2
@@ -46,7 +46,7 @@ Adafruit_MMA8451 mma;
 #define NUMBER_OF_PRESSURE_SENSORS 2
 #define NUMBER_OF_THERMOCOUPLES 3
 
-// Pressure sensor 0 = Fuel, Pressure sensor 1 = Oxidizer
+//Pressure sensor 0 = Fuel, Pressure sensor 1 = Oxidizer
 float pressure_hist_vals [NUMBER_OF_PRESSURE_SENSORS][PRESSURE_NUM_HIST_VALS];
 int pressure_val_num = 0;
 bool pressure_zero_ready = false;
@@ -87,16 +87,14 @@ int accel_error = 0;
 bool sensor_status = true;
 
 // Engine control setup
-typedef enum {
-  FUEL_PRE,
-  FUEL_MAIN,
-  OXY_PRE,
-  OXY_MAIN
-} valve_t;
+#define FUEL_PRE    0
+#define FUEL_MAIN   1
+#define OXY_PRE     2
+#define OXY_MAIN    3
 
 bool valve_status[] = {false, false, false, false};
 
-uint8_t valve_pins[] = {37, 36, 34, 39};
+uint8_t valve_pins[] = {37, 36, 39, 34};
 
 const char *valve_names[] = {"Fuel prestage", "Fuel mainstage", "Oxygen prestage", "Oxygen mainstage"};
 const char *valve_telemetry_ids[] = {"fuel_pre_setting", "fuel_main_setting", "oxy_pre_setting", "oxy_main_setting"};
@@ -151,9 +149,10 @@ void setup() {
 
   // Initialize engine controls
   for (uint8_t i = 0; i < sizeof(valve_pins); i++) {
-    pinMode(valve_pins[i], OUTPUT);
+    pinMode(valve_pins[i],OUTPUT);
   }
   pinMode(IGNITER_PIN, OUTPUT);
+  Serial.println("Setup Complete");
 }
 
 void loop() {
@@ -168,17 +167,20 @@ void loop() {
   chamber_temp[0] = read_thermocouple("Chamber 1", THERMO1_LED, chamber_thermocouple_1, chamber_temp_error[0]);
   chamber_temp[1] = read_thermocouple("Chamber 2", THERMO2_LED, chamber_thermocouple_2, chamber_temp_error[1]);
   chamber_temp[2] = read_thermocouple("Chamber 3", THERMO3_LED, chamber_thermocouple_3, chamber_temp_error[2]);
+  //Serial.println("Collected Thermocouple Data");
   #endif
   
   
   // Grab pressure data
   pressure_fuel = (analogRead(PRESSURE_FUEL) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val[0]); // Pressure is measured in PSIG
   pressure_ox = (analogRead(PRESSURE_OX) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - (PRESSURE_OFFSET + pressure_zero_val[1]); // Pressure is measured in PSIG
+  
   // TODO: Error checking
 
   // Update pressure tare data
   pressure_hist_vals[0][pressure_val_num] = pressure_fuel;
   pressure_hist_vals[1][pressure_val_num] = pressure_ox;
+  
   
   pressure_val_num++;
   if (pressure_val_num >= PRESSURE_NUM_HIST_VALS) {
@@ -195,7 +197,8 @@ void loop() {
   // Grab accelerometer data (acceleration is measured in m/s^2)
   sensors_vec_t accel = read_accelerometer(mma, accel_error);
   x=accel.x;  y=accel.y;  z=accel.z;
-
+  //commented out for now, accelermometer data being buggy
+  
   // Run autonomous control
   run_control();
 
@@ -207,8 +210,8 @@ void loop() {
   SEND_GROUP_ITEM(z)
   SEND_ITEM(outlet_temperature, outlet_temp)
   SEND_ITEM(inlet_temperature, inlet_temp)
-  SEND_ITEM(pressure_fuel, pressure_fuel)
-  SEND_ITEM(pressure_oxidizer, pressure_ox)   
+  //SEND_ITEM(pressure_fuel, pressure_fuel)
+  //SEND_ITEM(pressure_oxidizer, pressure_ox)   
   #if CONFIGURATION == MK_2
   SEND_ITEM(chamber_temperature_1, chamber_temp[0])
   SEND_ITEM(chamber_temperature_2, chamber_temp[2])
@@ -257,16 +260,16 @@ void loop() {
     abort_autosequence();
   }
   READ_FIELD(fuel_pre_command, "%d", valve_command) {
-    set_valve(FUEL_PRE, valve_command);
+    //set_valve(FUEL_PRE, valve_command);
   }
   READ_FIELD(fuel_main_command, "%d", valve_command) {
-    set_valve(FUEL_MAIN, valve_command);
+    //set_valve(FUEL_MAIN, valve_command);
   }
   READ_FIELD(oxy_pre_command, "%d", valve_command) {
-    set_valve(OXY_PRE, valve_command);
+    //set_valve(OXY_PRE, valve_command);
   }
   READ_FIELD(oxy_main_command, "%d", valve_command) {
-    set_valve(OXY_MAIN, valve_command);
+    //set_valve(OXY_MAIN, valve_command);
   }
   READ_DEFAULT(data_name, data) {
     Serial.print(F("Invalid data field recieved: "));
