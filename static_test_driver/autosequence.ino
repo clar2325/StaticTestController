@@ -58,8 +58,8 @@ void start_countdown() {
   }
   else if (valve_status[FUEL_PRE] ||
            valve_status[FUEL_MAIN] ||
-           valve_status[OXY_PRE] ||
-           valve_status[OXY_MAIN]) {
+           valve_status[OX_PRE] ||
+           valve_status[OX_MAIN]) {
     Serial.println(F("Countdown aborted due to unexpected initial state"));
     SET_STATE(STAND_BY) // Set state to signal countdown was aborted
   }
@@ -80,14 +80,14 @@ void abort_autosequence() {
 
     case PRESTAGE_READY:
       set_valve(FUEL_PRE, 0);
-      set_valve(OXY_PRE, 0);
+      set_valve(OX_PRE, 0);
       break;
 
     case PRESTAGE:
     case MAINSTAGE:
       SET_STATE(COOL_DOWN)
-      set_valve(OXY_PRE, 0);
-      set_valve(OXY_MAIN, 0);
+      set_valve(OX_PRE, 0);
+      set_valve(OX_MAIN, 0);
       delay(200); //closes the oxygen valves slightly before the fuel valves like in a normal shutdown but with a delay function instead because who cares about 200ms of blocking code in an abort procedure?
       set_valve(FUEL_PRE, 0);
       set_valve(FUEL_MAIN, 0);
@@ -110,7 +110,7 @@ void run_control() {
       if (run_time >= PRESTAGE_PREP_TIME) {
         SET_STATE(PRESTAGE_READY)
         set_valve(FUEL_PRE, 1);
-        set_valve(OXY_PRE, 1);
+        set_valve(OX_PRE, 1);
       }
       break;
     case PRESTAGE_READY:
@@ -125,7 +125,7 @@ void run_control() {
       if (run_time >= MAINSTAGE_TIME) {
         SET_STATE(MAINSTAGE)
         set_valve(FUEL_MAIN, 1);
-        set_valve(OXY_MAIN, 1);
+        set_valve(OX_MAIN, 1);
       }
       break;
     case MAINSTAGE:
@@ -154,6 +154,7 @@ void run_control() {
         set_valve(OXY_PRE, 0);
         set_valve(OXY_MAIN, 0);
       }
+      // TODO: Make this a separate state
 
       if (run_time >= RUN_TIME){
         SET_STATE(COOL_DOWN)
