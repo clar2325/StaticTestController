@@ -88,7 +88,6 @@ void abort_autosequence() {
       SET_STATE(COOL_DOWN)
       set_valve(OX_PRE, 0);
       set_valve(OX_MAIN, 0);
-      delay(200); //closes the oxygen valves slightly before the fuel valves like in a normal shutdown but with a delay function instead because who cares about 200ms of blocking code in an abort procedure?
       set_valve(FUEL_PRE, 0);
       set_valve(FUEL_MAIN, 0);
       shutdown_time = millis();
