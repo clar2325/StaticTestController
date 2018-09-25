@@ -1,4 +1,4 @@
-float mean (const float *data, unsigned int size) {
+float mean(const float *data, unsigned int size) {
   float result = 0;
   for (int i = 0; i < size; i++)
       result += data[i];

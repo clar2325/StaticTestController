@@ -87,11 +87,12 @@ int accel_error = 0;
 bool sensor_status = true;
 
 // Engine control setup
-#define FUEL_PRE    0
-#define FUEL_MAIN   1
-#define OXY_PRE     2
-#define OXY_MAIN    3
-//keeping these as defines not enums for now since that's how they were tested
+typedef enum {
+  FUEL_PRE,
+  FUEL_MAIN,
+  OX_PRE,
+  OX_MAIN
+} valve_t;
 
 bool valve_status[] = {false, false, false, false};
 
@@ -275,3 +276,4 @@ void loop() {
   }
   END_READ
 }
+
