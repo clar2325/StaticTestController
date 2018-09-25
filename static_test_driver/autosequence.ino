@@ -149,9 +149,9 @@ void run_control() {
       }
 
       //this checks 0.5 sec before runtime is up that the oxygen valves are open and closes them, and doesn't send more commands to close them once they are closed.
-      if (run_time >= RUN_TIME-OX_LEADTIME && valve_status[OXY_PRE] == 1 && valve_status[OXY_MAIN] == 1) {
-        set_valve(OXY_PRE, 0);
-        set_valve(OXY_MAIN, 0);
+      if (run_time >= RUN_TIME-OX_LEADTIME && valve_status[OX_PRE] == 1 && valve_status[OX_MAIN] == 1) {
+        set_valve(OX_PRE, 0);
+        set_valve(OX_MAIN, 0);
       }
       // TODO: Make this a separate state
 
