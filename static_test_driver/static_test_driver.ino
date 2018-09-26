@@ -199,9 +199,8 @@ void loop() {
   //TODO: Add error checking for temp?
   
   // Grab accelerometer data (acceleration is measured in m/s^2)
-  //sensors_vec_t accel = read_accelerometer(mma, accel_error);
-  //x=accel.x;  y=accel.y;  z=accel.z;
-  //commented out for now, accelermometer data being buggy
+  sensors_vec_t accel = read_accelerometer(mma, accel_error);
+  x=accel.x;  y=accel.y;  z=accel.z;
   
   // Run autonomous control
   run_control();
