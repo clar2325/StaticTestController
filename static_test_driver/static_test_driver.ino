@@ -193,8 +193,8 @@ void loop() {
   }
   
   // Grab analog temperature data
-  inlet_temp = (analogRead(INLET_TEMP) * 5.0 / 1024.0 - 0.5) * 100 ;
-  outlet_temp = (analogRead(OUTLET_TEMP) * 5.0 / 1024.0 - 0.5) * 100 ;
+  inlet_temp = analogRead(INLET_TEMP) * 5.0 * 100 / 1024;
+  outlet_temp = analogRead(OUTLET_TEMP) * 5.0 * 100 / 1024;
   
   //TODO: Add error checking for temp?
   
