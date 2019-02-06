@@ -143,11 +143,11 @@ void setup() {
   #endif
   
   // Calibrate load cell
-  scale.set_scale(LOAD_CELL_CALIBRATION_FACTOR); // This value is obtained by using the SparkFun_HX711_Calibration sketch
+  //scale.set_scale(LOAD_CELL_CALIBRATION_FACTOR); // This value is obtained by using the SparkFun_HX711_Calibration sketch
   
   // Initialize accelerometer
-  Wire.begin();
-  init_accelerometer(mma, STATE_LED);// Should be pin 13
+  //Wire.begin();
+  //init_accelerometer(mma, STATE_LED);// Should be pin 13
 
   // Initialize engine controls
   for (uint8_t i = 0; i < sizeof(valve_pins); i++) {
@@ -160,7 +160,7 @@ void setup() {
 void loop() {
   // Grab force data
   // TODO: This hangs when the load cell amp isn't connected. Figure out a way to check this first.
-  force = scale.get_units(); // Force is measured in lbs
+  //force = scale.get_units(); // Force is measured in lbs
   
   // TODO: Error checking for load cell?
   

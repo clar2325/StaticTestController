@@ -2,7 +2,8 @@
 #define PRESTAGE_PREP_TIME -500 // Time at which to open the prestage valves
 #define PRESTAGE_TIME      0
 #define MAINSTAGE_TIME     2000
-#define THRUST_CHECK_TIME  4000  // Time at which to start checking the engine is producing thrust, etc.
+#define THRUST_CHECK_TIME  4000 // Time at which to start checking the engine is producing thrust, etc.
+#define PRE_LEADTIME       250  // Delay between closing prestage and closing mainstage
 
 #if CONFIGURATION == DEMO
 #define COUNTDOWN_DURATION 10000 // 10 sec
@@ -38,6 +39,7 @@ typedef enum {
   PRESTAGE_READY,
   PRESTAGE,
   MAINSTAGE,
+  SHUTDOWN,
   COOL_DOWN
 } state_t;
 
@@ -84,12 +86,16 @@ void abort_autosequence() {
       break;
 
     case PRESTAGE:
-    case MAINSTAGE:
-      SET_STATE(COOL_DOWN)
       set_valve(OX_PRE, 0);
-      set_valve(OX_MAIN, 0);
       set_valve(FUEL_PRE, 0);
-      set_valve(FUEL_MAIN, 0);
+      SET_STATE(COOL_DOWN)
+      shutdown_time = millis();
+      break;
+      
+    case MAINSTAGE:
+      set_valve(OX_PRE, 0);
+      set_valve(FUEL_PRE, 0);
+      SET_STATE(SHUTDOWN)
       shutdown_time = millis();
       break;
   }
@@ -148,18 +154,24 @@ void run_control() {
         abort_autosequence();
       }
 
-      //this checks 0.5 sec before runtime is up that the oxygen valves are open and closes them, and doesn't send more commands to close them once they are closed.
+      // Checks just before runtime is up that the oxygen prestage valve is open and close it
       if (run_time >= RUN_TIME-OX_LEADTIME && valve_status[OX_PRE] == 1 && valve_status[OX_MAIN] == 1) {
         set_valve(OX_PRE, 0);
-        set_valve(OX_MAIN, 0);
       }
-      // TODO: Make this a separate state
 
-      if (run_time >= RUN_TIME){
-        SET_STATE(COOL_DOWN)
+      if (run_time >= RUN_TIME) {
+        SET_STATE(SHUTDOWN)
         set_valve(FUEL_PRE, 0);
-        set_valve(FUEL_MAIN, 0);
         shutdown_time = millis();
+      }
+      break;
+
+    case SHUTDOWN:
+      if (millis() >= shutdown_time + PRE_LEADTIME) {
+        Serial.println(F("Closing mainstage after abort"));
+        set_valve(OX_MAIN, 0);
+        set_valve(FUEL_MAIN, 0);
+        SET_STATE(COOL_DOWN)
       }
       break;
 
