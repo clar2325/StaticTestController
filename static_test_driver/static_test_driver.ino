@@ -19,9 +19,9 @@
 #include <avr/pgmspace.h>
 
 // LEDs
-#define THERMO1_LED 28
-#define THERMO2_LED 30
-#define THERMO3_LED 32
+#define THERMO1_LED 31
+#define THERMO2_LED 33
+#define THERMO3_LED 35
 #define FORCE_LED 42
 #define PRESSURE_FUEL_LED 44
 #define PRESSURE_OX_LED 50 
@@ -34,14 +34,14 @@
 Adafruit_MMA8451 mma;
 
 // Analog Temperature Setup
-#define INLET_TEMP A4
-#define OUTLET_TEMP A5
+#define INLET_TEMP A13
+#define OUTLET_TEMP A14
 
 // Pressure Setup
 #define PRESSURE_CALIBRATION_FACTOR 246.58
 #define PRESSURE_OFFSET 118.33
-#define PRESSURE_FUEL A2
-#define PRESSURE_OX A3 
+#define PRESSURE_FUEL A11
+#define PRESSURE_OX A12
 #define PRESSURE_NUM_HIST_VALS 10
 #define NUMBER_OF_PRESSURE_SENSORS 2
 #define NUMBER_OF_THERMOCOUPLES 3
@@ -54,11 +54,11 @@ float pressure_zero_val[NUMBER_OF_PRESSURE_SENSORS] = {0,0};
 
 // Thermocouple setup for MK_2
 #if CONFIGURATION == MK_2
-#define MAXDO   24
-#define MAXCLK  52
-#define MAXCS1  22
-#define MAXCS2  33
-#define MAXCS3  31
+#define MAXDO   36
+#define MAXCLK  38
+#define MAXCS1  30
+#define MAXCS2  32
+#define MAXCS3  34
 Adafruit_MAX31855 chamber_thermocouple_1(MAXCLK, MAXCS1, MAXDO);
 Adafruit_MAX31855 chamber_thermocouple_2(MAXCLK, MAXCS2, MAXDO);
 Adafruit_MAX31855 chamber_thermocouple_3(MAXCLK, MAXCS3, MAXDO);
@@ -71,7 +71,7 @@ Adafruit_MAX31855 chamber_thermocouple_3(MAXCLK, MAXCS3, MAXDO);
 #define LOAD_CELL_CALIBRATION_FACTOR 1067141
 #endif
 
-#define LOAD_CELL_DOUT 2
+#define LOAD_CELL_DOUT 24
 #define LOAD_CELL_CLK  26
 HX711 scale(LOAD_CELL_DOUT, LOAD_CELL_CLK);
 
@@ -96,7 +96,7 @@ typedef enum {
 
 bool valve_status[] = {false, false, false, false};
 
-uint8_t valve_pins[] = {37, 36, 39, 34};
+uint8_t valve_pins[] = {31, 32, 33, 34};
 
 const char *valve_names[] = {"Fuel prestage", "Fuel mainstage", "Oxygen prestage", "Oxygen mainstage"};
 const char *valve_telemetry_ids[] = {"fuel_pre_setting", "fuel_main_setting", "ox_pre_setting", "ox_main_setting"};
@@ -143,7 +143,7 @@ void setup() {
   #endif
   
   // Calibrate load cell
-  //scale.set_scale(LOAD_CELL_CALIBRATION_FACTOR); // This value is obtained by using the SparkFun_HX711_Calibration sketch
+  scale.set_scale(LOAD_CELL_CALIBRATION_FACTOR); // This value is obtained by using the SparkFun_HX711_Calibration sketch
   
   // Initialize accelerometer
   //Wire.begin();
@@ -160,7 +160,7 @@ void setup() {
 void loop() {
   // Grab force data
   // TODO: This hangs when the load cell amp isn't connected. Figure out a way to check this first.
-  //force = scale.get_units(); // Force is measured in lbs
+  force = scale.get_units(); // Force is measured in lbs
   
   // TODO: Error checking for load cell?
   
@@ -275,4 +275,3 @@ void loop() {
   }
   END_READ
 }
-
