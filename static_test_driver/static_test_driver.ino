@@ -22,35 +22,37 @@
 #define THERMO1_LED 31
 #define THERMO2_LED 33
 #define THERMO3_LED 35
+#define ACCEL_LED 42
 #define FORCE_LED 42
 #define PRESSURE_FUEL_LED 44
-#define PRESSURE_OX_LED 50 
+#define PRESSURE_OX_LED 50
 #define INLET_TEMP_LED 46 
 #define OUTLET_TEMP_LED 48 
-#define STATE_LED 38 //TODO: Discard STATE_LED code for current sensors revision due to pin conflict. Pin # was changed to satisfy next revision
-#define STATUS_LED 40 //TODO: Discare STATUS_LED code for current sensors revision due to pin conflict. Pin # was changed to satisfy next revision
+#define STATE_LED 38
+#define STATUS_LED 40
 
 // Accelerometer
 Adafruit_MMA8451 mma;
+int accel_error = 0;
 
 // Analog Temperature Setup
 #define INLET_TEMP A13
 #define OUTLET_TEMP A14
+#define NUMBER_OF_TEMP_SENSORS 2
+int temp_error[NUMBER_OF_TEMP_SENSORS] = {0,0};
 
 // Pressure Setup
-#define PRESSURE_CALIBRATION_FACTOR 246.58
-#define PRESSURE_OFFSET 118.33
 #define PRESSURE_FUEL A11
 #define PRESSURE_OX A12
 #define PRESSURE_NUM_HIST_VALS 10
 #define NUMBER_OF_PRESSURE_SENSORS 2
-#define NUMBER_OF_THERMOCOUPLES 3
 
 // Pressure sensor 0 = Fuel, Pressure sensor 1 = Oxidizer
-float pressure_hist_vals [NUMBER_OF_PRESSURE_SENSORS][PRESSURE_NUM_HIST_VALS];
+float pressure_hist_vals[NUMBER_OF_PRESSURE_SENSORS][PRESSURE_NUM_HIST_VALS];
 int pressure_val_num = 0;
 bool pressure_zero_ready = false;
 float pressure_zero_val[NUMBER_OF_PRESSURE_SENSORS] = {0,0};
+int pressure_error[NUMBER_OF_PRESSURE_SENSORS] = {0,0};
 
 // Thermocouple setup for MK_2
 #if CONFIGURATION == MK_2
@@ -62,31 +64,25 @@ float pressure_zero_val[NUMBER_OF_PRESSURE_SENSORS] = {0,0};
 Adafruit_MAX31855 chamber_thermocouple_1(MAXCLK, MAXCS1, MAXDO);
 Adafruit_MAX31855 chamber_thermocouple_2(MAXCLK, MAXCS2, MAXDO);
 Adafruit_MAX31855 chamber_thermocouple_3(MAXCLK, MAXCS3, MAXDO);
+#define NUMBER_OF_THERMOCOUPLES 3
+int thermocouple_error[NUMBER_OF_THERMOCOUPLES] = {0,0,0};
 #endif
 
 // Load cell setup
-#if CONFIGURATION == MK_2
-#define LOAD_CELL_CALIBRATION_FACTOR 20400.0 //This value is obtained using the SparkFun_HX711_Calibration sketch
-#else
-#define LOAD_CELL_CALIBRATION_FACTOR 1067141
-#endif
-
-#define LOAD_CELL_DOUT 24
-#define LOAD_CELL_CLK  26
+#define LOAD_CELL_DOUT 2
+#define LOAD_CELL_CLK  48
 HX711 scale(LOAD_CELL_DOUT, LOAD_CELL_CLK);
+int force_error = 0;
 
 // Sensor data
-float chamber_temp[NUMBER_OF_THERMOCOUPLES], pressure_fuel, pressure_ox, force, x,y,z, inlet_temp, outlet_temp;
+#if CONFIGURATION == MK_2
+float chamber_temp[NUMBER_OF_THERMOCOUPLES];
+#endif
+float pressure_fuel, pressure_ox, force, x,y,z, inlet_temp, outlet_temp;
 
-#define SENSOR_ERROR_LIMIT 5 // Max number of errors in a row before deciding a sensor is faulty
-
-int chamber_temp_error[NUMBER_OF_THERMOCOUPLES] = {0,0,0};
-int pressure_error[NUMBER_OF_PRESSURE_SENSORS] = {0,0};
-int force_error = 0;
-int accel_error = 0;
 bool sensor_status = true;
 
-// Engine control setup
+// Engine controls
 typedef enum {
   FUEL_PRE,
   FUEL_MAIN,
@@ -96,24 +92,18 @@ typedef enum {
 
 bool valve_status[] = {false, false, false, false};
 
-uint8_t valve_pins[] = {31, 32, 33, 34};
-
-const char *valve_names[] = {"Fuel prestage", "Fuel mainstage", "Oxygen prestage", "Oxygen mainstage"};
-const char *valve_telemetry_ids[] = {"fuel_pre_setting", "fuel_main_setting", "ox_pre_setting", "ox_main_setting"};
-
 char data[10] = "";
 char data_name[20] = "";
-
-#define IGNITER_PIN 15
 
 void setup() {
   // Initialize LED pins to be outputs
   pinMode(THERMO1_LED, OUTPUT);
   pinMode(THERMO2_LED, OUTPUT);
   pinMode(THERMO3_LED, OUTPUT);
+  pinMode(ACCEL_LED, OUTPUT);
+  pinMode(FORCE_LED, OUTPUT);
   pinMode(INLET_TEMP_LED, OUTPUT);
   pinMode(OUTLET_TEMP_LED, OUTPUT);
-  pinMode(FORCE_LED, OUTPUT);
   pinMode(PRESSURE_FUEL_LED, OUTPUT);
   pinMode(PRESSURE_OX_LED, OUTPUT);
   pinMode(STATE_LED, OUTPUT);
@@ -142,40 +132,33 @@ void setup() {
   init_thermocouple("Chamber 3", THERMO3_LED, chamber_thermocouple_3);  
   #endif
   
-  // Calibrate load cell
-  scale.set_scale(LOAD_CELL_CALIBRATION_FACTOR); // This value is obtained by using the SparkFun_HX711_Calibration sketch
+  // Initialize load cell
+  init_force(FORCE_LED, scale);
   
   // Initialize accelerometer
-  //Wire.begin();
-  //init_accelerometer(mma, STATE_LED);// Should be pin 13
+  Wire.begin();
+  init_accelerometer(ACCEL_LED, mma);
 
   // Initialize engine controls
-  for (uint8_t i = 0; i < sizeof(valve_pins); i++) {
-    pinMode(valve_pins[i], OUTPUT);
-  }
-  pinMode(IGNITER_PIN, OUTPUT);
+  init_engine();
+  
   Serial.println("Setup Complete");
 }
 
 void loop() {
   // Grab force data
-  // TODO: This hangs when the load cell amp isn't connected. Figure out a way to check this first.
-  force = scale.get_units(); // Force is measured in lbs
-  
-  // TODO: Error checking for load cell?
+  force = read_force(FORCE_LED, scale, force_error); // Force is measured in lbs
   
   // Grab thermocouple data for Mk.2
   #if CONFIGURATION == MK_2
-  chamber_temp[0] = read_thermocouple("Chamber 1", THERMO1_LED, chamber_thermocouple_1, chamber_temp_error[0]);
-  chamber_temp[1] = read_thermocouple("Chamber 2", THERMO2_LED, chamber_thermocouple_2, chamber_temp_error[1]);
-  chamber_temp[2] = read_thermocouple("Chamber 3", THERMO3_LED, chamber_thermocouple_3, chamber_temp_error[2]);
-  //Serial.println("Collected Thermocouple Data");
+  chamber_temp[0] = read_thermocouple("Chamber 1", THERMO1_LED, chamber_thermocouple_1, thermocouple_error[0]);
+  chamber_temp[1] = read_thermocouple("Chamber 2", THERMO2_LED, chamber_thermocouple_2, thermocouple_error[1]);
+  chamber_temp[2] = read_thermocouple("Chamber 3", THERMO3_LED, chamber_thermocouple_3, thermocouple_error[2]);
   #endif
   
   // Grab pressure data
-  pressure_fuel = (analogRead(PRESSURE_FUEL) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET; // Pressure is measured in PSIG
-  pressure_ox = (analogRead(PRESSURE_OX) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET; // Pressure is measured in PSIG
-  // TODO: Error checking
+  pressure_fuel = read_pressure("Fuel", PRESSURE_FUEL_LED, PRESSURE_FUEL, pressure_error[0]);
+  pressure_ox = read_pressure("Oxygen", PRESSURE_OX_LED, PRESSURE_OX, pressure_error[0]);
   
   // Update pressure tare data
   pressure_hist_vals[0][pressure_val_num] = pressure_fuel;
@@ -184,7 +167,6 @@ void loop() {
   // Tare pressures
   pressure_fuel -= pressure_zero_val[0];
   pressure_ox -= pressure_zero_val[1];
-
   
   pressure_val_num++;
   if (pressure_val_num >= PRESSURE_NUM_HIST_VALS) {
@@ -193,13 +175,11 @@ void loop() {
   }
   
   // Grab analog temperature data
-  inlet_temp = analogRead(INLET_TEMP) * 5.0 * 100 / 1024;
-  outlet_temp = analogRead(OUTLET_TEMP) * 5.0 * 100 / 1024;
-  
-  //TODO: Add error checking for temp?
+  inlet_temp = read_temp("Inlet", INLET_TEMP_LED, INLET_TEMP, temp_error[0]);
+  outlet_temp = read_temp("Outlet", OUTLET_TEMP_LED, OUTLET_TEMP, temp_error[1]);
   
   // Grab accelerometer data (acceleration is measured in m/s^2)
-  sensors_vec_t accel = read_accelerometer(mma, accel_error);
+  sensors_vec_t accel = read_accelerometer(ACCEL_LED, mma, accel_error);
   x=accel.x;  y=accel.y;  z=accel.z;
   
   // Run autonomous control

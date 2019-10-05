@@ -3,7 +3,8 @@
 #define PRESTAGE_TIME      0
 #define MAINSTAGE_TIME     2000
 #define THRUST_CHECK_TIME  4000 // Time at which to start checking the engine is producing thrust, etc.
-#define PRE_LEADTIME       250  // Delay between closing prestage and closing mainstage
+#define OX_LEADTIME        500  // Delay between closing oxygen and closing fuel prestage
+#define PRE_LEADTIME       1000 // Delay between closing oxygen prestage and closing both mainstage
 
 #if CONFIGURATION == DEMO
 #define COUNTDOWN_DURATION 10000 // 10 sec
@@ -12,7 +13,6 @@
 #else
 #define COUNTDOWN_DURATION 60000 // 1 min
 #define RUN_TIME           12000 // 12 sec
-#define OX_LEADTIME        500 // 0.5 sec time for oxidizer to close before fuel
 #define COOLDOWN_TIME      60000 * 5 // 5 mins
 #endif
 
@@ -39,6 +39,7 @@ typedef enum {
   PRESTAGE_READY,
   PRESTAGE,
   MAINSTAGE,
+  OXYGEN_SHUTDOWN,
   SHUTDOWN,
   COOL_DOWN
 } state_t;
@@ -52,6 +53,10 @@ typedef enum {
 long start_time = 0;
 long shutdown_time = 0;
 state_t state = STAND_BY;
+
+void blink(int led, long period) {
+  digitalWrite(led, (millis() % period) * 2 / period);
+}
 
 void start_countdown() {
   if (!sensor_status) {
@@ -83,11 +88,13 @@ void abort_autosequence() {
     case PRESTAGE_READY:
       set_valve(FUEL_PRE, 0);
       set_valve(OX_PRE, 0);
+      SET_STATE(STAND_BY)
       break;
 
     case PRESTAGE:
       set_valve(OX_PRE, 0);
       set_valve(FUEL_PRE, 0);
+      reset_igniter();
       SET_STATE(COOL_DOWN)
       shutdown_time = millis();
       break;
@@ -105,13 +112,18 @@ void run_control() {
   long run_time = millis() - start_time - COUNTDOWN_DURATION;
   SEND(run_time, run_time)
 
-  // TODO: There should be a lot more here, also checking if things went wrong
   switch (state) {
     case STAND_BY:
       // State that waits for a person to begin the test
+      digitalWrite(STATE_LED, LOW);
       break;
     case TERMINAL_COUNT:
       // Countdown state
+      blink(STATE_LED, TERMINAL_COUNT_LED_PERIOD);
+      if (!sensor_status) {
+        Serial.println(F("Sensor failure"));
+        abort_autosequence();
+      }
       if (run_time >= PRESTAGE_PREP_TIME) {
         SET_STATE(PRESTAGE_READY)
         set_valve(FUEL_PRE, 1);
@@ -120,6 +132,7 @@ void run_control() {
       break;
     case PRESTAGE_READY:
       // State to wait for ignition after prestage valves are open
+      digitalWrite(STATE_LED, HIGH);
       if (run_time >= PRESTAGE_TIME) {
         SET_STATE(PRESTAGE)
         fire_igniter();
@@ -127,13 +140,17 @@ void run_control() {
       break;
     case PRESTAGE:
       // State to wait for mainstage valves to be opened after ignition
+      digitalWrite(STATE_LED, HIGH);
       if (run_time >= MAINSTAGE_TIME) {
         SET_STATE(MAINSTAGE)
         set_valve(FUEL_MAIN, 1);
         set_valve(OX_MAIN, 1);
+        reset_igniter();
       }
       break;
     case MAINSTAGE:
+      // State for active firing of the engine
+      digitalWrite(STATE_LED, HIGH);
       // Check that the sensors are still working
       if (!sensor_status) {
         Serial.println(F("Sensor failure"));
@@ -145,30 +162,31 @@ void run_control() {
         abort_autosequence();
       }
       // Check that the engine is producing thrust once mainstage valves are fully open
-#if CONFIGURATION != DEMO
       else if (run_time >= THRUST_CHECK_TIME && force < MIN_THRUST) {
-#else
-      else if (run_time >= THRUST_CHECK_TIME && force < MIN_THRUST) {
-#endif
         Serial.println(F("Thrust below critical level"));
         abort_autosequence();
       }
 
-      // Checks just before runtime is up that the oxygen prestage valve is open and close it
-      if (run_time >= RUN_TIME-OX_LEADTIME && valve_status[OX_PRE] == 1 && valve_status[OX_MAIN] == 1) {
-        set_valve(OX_PRE, 0);
-      }
-
       if (run_time >= RUN_TIME) {
-        SET_STATE(SHUTDOWN)
-        set_valve(FUEL_PRE, 0);
+        SET_STATE(OXYGEN_SHUTDOWN)
+        set_valve(OX_PRE, 0);
         shutdown_time = millis();
       }
       break;
 
+    case OXYGEN_SHUTDOWN:
+      // Oxygen prestage valve is closed, others are still open
+      digitalWrite(STATE_LED, LOW);
+      if (millis() >= shutdown_time + OX_LEADTIME) {
+        set_valve(FUEL_PRE, 0);
+        SET_STATE(SHUTDOWN)
+      }
+      break;
+
     case SHUTDOWN:
+      // Both prestage valves are closed, others may still be open
+      digitalWrite(STATE_LED, LOW);
       if (millis() >= shutdown_time + PRE_LEADTIME) {
-        Serial.println(F("Closing mainstage after abort"));
         set_valve(OX_MAIN, 0);
         set_valve(FUEL_MAIN, 0);
         SET_STATE(COOL_DOWN)
@@ -177,7 +195,7 @@ void run_control() {
 
     case COOL_DOWN:
       // State that waits for cool-down to take place after a run is complete
-      digitalWrite(STATE_LED, (millis() % COOL_DOWN_LED_PERIOD) * 2 / COOL_DOWN_LED_PERIOD);
+      blink(STATE_LED, COOL_DOWN_LED_PERIOD);
       if (millis() - shutdown_time >= COOLDOWN_TIME) {
         Serial.println(F("Run finished"));
         SET_STATE(STAND_BY)
@@ -186,4 +204,3 @@ void run_control() {
       break;
   }
 }
-
