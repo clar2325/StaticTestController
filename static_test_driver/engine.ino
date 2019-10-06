@@ -1,5 +1,5 @@
 
-uint8_t valve_pins[] = {31, 32, 33, 34};
+const uint8_t valve_pins[] = {31, 32, 33, 34};
 
 #define IGNITER_PIN 15
 

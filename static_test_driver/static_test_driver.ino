@@ -23,27 +23,27 @@
 #define THERMO2_LED 33
 #define THERMO3_LED 35
 #define ACCEL_LED 42
-#define FORCE_LED 42
-#define PRESSURE_FUEL_LED 44
-#define PRESSURE_OX_LED 50
-#define INLET_TEMP_LED 46 
-#define OUTLET_TEMP_LED 48 
-#define STATE_LED 38
-#define STATUS_LED 40
+#define FORCE_LED 40
+#define PRESSURE_FUEL_LED 38
+#define PRESSURE_OX_LED 24
+#define INLET_TEMP_LED 26
+#define OUTLET_TEMP_LED 28
+#define STATE_LED 36
+#define STATUS_LED 30
 
 // Accelerometer
 Adafruit_MMA8451 mma;
 int accel_error = 0;
 
 // Analog Temperature Setup
-#define INLET_TEMP A13
-#define OUTLET_TEMP A14
+#define INLET_TEMP A5
+#define OUTLET_TEMP A4
 #define NUMBER_OF_TEMP_SENSORS 2
 int temp_error[NUMBER_OF_TEMP_SENSORS] = {0,0};
 
 // Pressure Setup
-#define PRESSURE_FUEL A11
-#define PRESSURE_OX A12
+#define PRESSURE_FUEL A3
+#define PRESSURE_OX A4
 #define PRESSURE_NUM_HIST_VALS 10
 #define NUMBER_OF_PRESSURE_SENSORS 2
 
