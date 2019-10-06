@@ -97,9 +97,11 @@ char data_name[20] = "";
 
 void setup() {
   // Initialize LED pins to be outputs
+#if CONFIGURATION == MK_2
   pinMode(THERMO1_LED, OUTPUT);
   pinMode(THERMO2_LED, OUTPUT);
   pinMode(THERMO3_LED, OUTPUT);
+#endif
   pinMode(ACCEL_LED, OUTPUT);
   pinMode(FORCE_LED, OUTPUT);
   pinMode(INLET_TEMP_LED, OUTPUT);
@@ -109,15 +111,30 @@ void setup() {
   pinMode(STATE_LED, OUTPUT);
   pinMode(STATUS_LED, OUTPUT);
 
+  // Initially turn on all the LEDs
+#if CONFIGURATION == MK_2
+  digitalWrite(THERMO1_LED, HIGH);
+  digitalWrite(THERMO2_LED, HIGH);
+  digitalWrite(THERMO3_LED, HIGH);
+#endif
+  digitalWrite(ACCEL_LED, HIGH);
+  digitalWrite(FORCE_LED, HIGH);
+  digitalWrite(INLET_TEMP_LED, HIGH);
+  digitalWrite(OUTLET_TEMP_LED, HIGH);
+  digitalWrite(PRESSURE_FUEL_LED, HIGH);
+  digitalWrite(PRESSURE_OX_LED, HIGH);
+  digitalWrite(STATE_LED, HIGH);
+  digitalWrite(STATUS_LED, HIGH);
+
   // Initialize serial
   while (!Serial);
   Serial.begin(115200);
   Serial.println(F("Initializing..."));
   
-  // wait for MAX chips to stabilize
+  // wait for chips to stabilize
   delay(500);
   
-  //Initialize Pressure Sensors
+  // Initialize Pressure Sensors
   pinMode(PRESSURE_FUEL, INPUT);
   pinMode(PRESSURE_OX, INPUT);
   
