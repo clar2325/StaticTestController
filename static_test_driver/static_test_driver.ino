@@ -250,6 +250,7 @@ void loop() {
     start_countdown();
   }
   READ_FLAG(stop) {
+    Serial.println(F("Manual abort initiated"));
     abort_autosequence();
   }
   READ_FIELD(fuel_pre_command, "%d", valve_command) {

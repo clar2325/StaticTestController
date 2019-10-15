@@ -59,14 +59,16 @@ void blink(int led, long period) {
 }
 
 void start_countdown() {
+  #if CONFIGURATION != DEMO
   if (!sensor_status) {
     Serial.println(F("Countdown aborted due to sensor failure"));
     SET_STATE(STAND_BY) // Set state to signal countdown was aborted
-  }
-  else if (valve_status[FUEL_PRE] ||
-           valve_status[FUEL_MAIN] ||
-           valve_status[OX_PRE] ||
-           valve_status[OX_MAIN]) {
+  } else
+  #endif
+  if (valve_status[FUEL_PRE] ||
+      valve_status[FUEL_MAIN] ||
+      valve_status[OX_PRE] ||
+      valve_status[OX_MAIN]) {
     Serial.println(F("Countdown aborted due to unexpected initial state"));
     SET_STATE(STAND_BY) // Set state to signal countdown was aborted
   }
@@ -120,10 +122,13 @@ void run_control() {
     case TERMINAL_COUNT:
       // Countdown state
       blink(STATE_LED, TERMINAL_COUNT_LED_PERIOD);
+      #if CONFIGURATION != DEMO
       if (!sensor_status) {
         Serial.println(F("Sensor failure"));
         abort_autosequence();
       }
+      else
+      #endif
       if (run_time >= PRESTAGE_PREP_TIME) {
         SET_STATE(PRESTAGE_READY)
         set_valve(FUEL_PRE, 1);
@@ -151,13 +156,16 @@ void run_control() {
     case MAINSTAGE:
       // State for active firing of the engine
       digitalWrite(STATE_LED, HIGH);
+      #if CONFIGURATION != DEMO
       // Check that the sensors are still working
       if (!sensor_status) {
         Serial.println(F("Sensor failure"));
         abort_autosequence();
       }
+      else
+      #endif
       // Check that the coolant temperature has not exceeded the maximum limit
-      else if (outlet_temp >= MAX_COOLANT_TEMP) {
+      if (outlet_temp >= MAX_COOLANT_TEMP) {
         Serial.println(F("Temperature reached critical level"));
         abort_autosequence();
       }
