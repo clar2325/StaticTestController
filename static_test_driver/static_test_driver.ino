@@ -22,14 +22,14 @@
 #define THERMO1_LED 31
 #define THERMO2_LED 33
 #define THERMO3_LED 35
-#define ACCEL_LED 42
-#define FORCE_LED 40
-#define PRESSURE_FUEL_LED 38
-#define PRESSURE_OX_LED 24
-#define INLET_TEMP_LED 26
-#define OUTLET_TEMP_LED 28
-#define STATE_LED 36
-#define STATUS_LED 30
+#define ACCEL_LED 30
+#define FORCE_LED 28
+#define PRESSURE_FUEL_LED 36
+#define PRESSURE_OX_LED 50
+#define INLET_TEMP_LED 48
+#define OUTLET_TEMP_LED 46
+#define STATE_LED 38
+#define STATUS_LED 44
 
 // Accelerometer
 Adafruit_MMA8451 mma;
@@ -70,8 +70,8 @@ int thermocouple_error[NUMBER_OF_THERMOCOUPLES] = {0,0,0};
 
 // Load cell setup
 #define LOAD_CELL_DOUT 2
-#define LOAD_CELL_CLK  48
-HX711 scale(LOAD_CELL_DOUT, LOAD_CELL_CLK);
+#define LOAD_CELL_CLK  26
+HX711 scale;
 int force_error = 0;
 
 // Sensor data

@@ -10,6 +10,9 @@
 #define LOAD_CELL_CALIBRATION_FACTOR 1067141
 #endif
 
+#define LOAD_CELL_RETRY_INTERVAL 10
+#define LOAD_CELL_MAX_RETRIES 20
+
 float mean(const float *data, unsigned int size) {
   float result = 0;
   for (int i = 0; i < size; i++)
@@ -39,7 +42,7 @@ void error_check(const char *sensor_name, const char *sensor_type, int led, int 
 
 float read_temp(const char *sensor_name, int led, int sensor, int &error) {
   float result = analogRead(sensor) * 5.0 * 100 / 1024;
-  error_check(sensor_name, "temp", led, error, result > 0 && result < 150);
+  error_check(sensor_name, "temp", led, error, result > 0 && result < 100);
   return result;
 }
 
@@ -76,26 +79,28 @@ void init_accelerometer(int led, Adafruit_MMA8451 &mma) {
     working = true;
   }
   int error = 0;
-  error_check("", "Accelerometer", led, error, working);
+  error_check("Accelerometer", "", led, error, working);
   delay(100);
 }
 
 sensors_vec_t read_accelerometer(int led, Adafruit_MMA8451 &mma, int &error) {
   sensors_event_t event;
-  mma.getEvent(&event);
+//  mma.getEvent(&event);
   sensors_vec_t accel = event.acceleration;
   error_check("Accelerometer", "", led, error, abs(accel.x) < 2 && abs(accel.y) < 2 && abs(accel.z) < 2);
   return accel;
 }
 
 void init_force(int led, HX711 &scale) {
-  int error = 0;
-  error_check("", "Force", led, error, scale.is_ready());
+  scale.begin(LOAD_CELL_DOUT, LOAD_CELL_CLK);
   
   // Calibrate load cell
   scale.set_scale(LOAD_CELL_CALIBRATION_FACTOR); // This value is obtained by using the SparkFun_HX711_Calibration sketch
-  
+
+  // Try reading a value from the load cell
+  int error = 0;
   read_force(led, scale, error);
+  
   if (!error) {
     Serial.println(F("Load cell amp connected"));
     digitalWrite(led, HIGH);
@@ -104,7 +109,21 @@ void init_force(int led, HX711 &scale) {
 }
 
 float read_force(int led, HX711 &scale, int &error) {
-  float result = scale.get_units();
-  error_check("", "Force", led, error, !isnan(result) && result > 0);
+  // Wait for load cell data to become ready
+  bool is_ready = false;
+  for (unsigned i = 0; i < LOAD_CELL_MAX_RETRIES; i++) {
+    if (scale.is_ready()) {
+      is_ready = true;
+      break;
+    }
+    delay(LOAD_CELL_RETRY_INTERVAL);
+  }
+
+  // Read a value from the load cell
+  float result = 0;
+  if (is_ready) {
+    result = scale.get_units();
+  }
+  error_check("Force", "", led, error, is_ready && !isnan(result) && result > 0);
   return result;
 }
