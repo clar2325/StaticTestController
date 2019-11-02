@@ -3,11 +3,21 @@
 
 #define PRESSURE_CALIBRATION_FACTOR 246.58
 #define PRESSURE_OFFSET 118.33
+#define PRESSURE_MIN_VALID -100
+#define PRESSURE_MAX_VALID 1000
+
+#define TEMP_MIN_VALID 0
+#define TEMP_MAX_VALID 120
+
+#define ACCEL_MAX_VALID 20
+
+#define FORCE_MIN_VALID -50
+#define FORCE_MAX_VALID 500
 
 #if CONFIGURATION == MK_2
 #define LOAD_CELL_CALIBRATION_FACTOR 20400.0 //This value is obtained using the SparkFun_HX711_Calibration sketch
 #else
-#define LOAD_CELL_CALIBRATION_FACTOR 1067141
+#define LOAD_CELL_CALIBRATION_FACTOR 20400
 #endif
 
 #define LOAD_CELL_RETRY_INTERVAL 10
@@ -23,7 +33,6 @@ float mean(const float *data, unsigned int size) {
 void error_check(const char *sensor_name, const char *sensor_type, int led, int &error, bool working) {
   if (working) {
     error = 0;
-    digitalWrite(led, HIGH);
   } else {
     if (!error) {
       Serial.print(sensor_name);
@@ -42,13 +51,13 @@ void error_check(const char *sensor_name, const char *sensor_type, int led, int 
 
 float read_temp(const char *sensor_name, int led, int sensor, int &error) {
   float result = analogRead(sensor) * 5.0 * 100 / 1024;
-  error_check(sensor_name, "temp", led, error, result > 0 && result < 100);
+  error_check(sensor_name, "temp", led, error, result > TEMP_MIN_VALID && result < TEMP_MAX_VALID);
   return result;
 }
 
 float read_pressure(const char *sensor_name, int led, int sensor, int &error) {
-  float result = (analogRead(PRESSURE_FUEL) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET;
-  error_check(sensor_name, "pressure", led, error, result > 0 && result < 150);
+  float result = (analogRead(sensor) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET;
+  error_check(sensor_name, "pressure", led, error, result > PRESSURE_MIN_VALID && result < PRESSURE_MAX_VALID);
   return result;
 }
 
@@ -85,9 +94,9 @@ void init_accelerometer(int led, Adafruit_MMA8451 &mma) {
 
 sensors_vec_t read_accelerometer(int led, Adafruit_MMA8451 &mma, int &error) {
   sensors_event_t event;
-//  mma.getEvent(&event);
+  mma.getEvent(&event);
   sensors_vec_t accel = event.acceleration;
-  error_check("Accelerometer", "", led, error, abs(accel.x) < 2 && abs(accel.y) < 2 && abs(accel.z) < 2);
+  error_check("Accelerometer", "", led, error, abs(accel.x) < ACCEL_MAX_VALID * 2 && abs(accel.y) < ACCEL_MAX_VALID * 2 && abs(accel.z) < ACCEL_MAX_VALID * 2);
   return accel;
 }
 
@@ -124,6 +133,6 @@ float read_force(int led, HX711 &scale, int &error) {
   if (is_ready) {
     result = scale.get_units();
   }
-  error_check("Force", "", led, error, is_ready && !isnan(result) && result > 0);
+  error_check("Force", "", led, error, is_ready && !isnan(result) && result > FORCE_MIN_VALID && result < FORCE_MAX_VALID);
   return result;
 }

@@ -24,7 +24,7 @@
 #if CONFIGURATION == DEMO
 #define MIN_THRUST 50
 #elif CONFIGURATION == MK_1
-#define MIN_THRUST 2
+#define MIN_THRUST 20
 #elif CONFIGURATION == MK_2
 #define MIN_THRUST 1000
 #endif
@@ -55,7 +55,7 @@ long shutdown_time = 0;
 state_t state = STAND_BY;
 
 void blink(int led, long period) {
-  digitalWrite(led, (millis() % period) * 2 / period);
+  digitalWrite(led, (int)((millis() % (period * 2)) / period));
 }
 
 void start_countdown() {
