@@ -253,6 +253,9 @@ void loop() {
     Serial.println(F("Manual abort initiated"));
     abort_autosequence();
   }
+  READ_FLAG(fire_igniter) {
+    fire_igniter();
+  }
   READ_FIELD(fuel_pre_command, "%d", valve_command) {
     set_valve(FUEL_PRE, valve_command);
   }

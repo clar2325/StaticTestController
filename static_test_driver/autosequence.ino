@@ -114,6 +114,8 @@ void run_control() {
   long run_time = millis() - start_time - COUNTDOWN_DURATION;
   SEND(run_time, run_time)
 
+  handle_igniter();
+
   switch (state) {
     case STAND_BY:
       // State that waits for a person to begin the test
@@ -150,7 +152,6 @@ void run_control() {
         SET_STATE(MAINSTAGE)
         set_valve(FUEL_MAIN, 1);
         set_valve(OX_MAIN, 1);
-        reset_igniter();
       }
       break;
     case MAINSTAGE:
