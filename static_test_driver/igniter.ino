@@ -1,7 +1,12 @@
 
 #define IGNITER_PIN 15
 
+#if CONFIGURATION == DEMO
+#define IGNITER_DURATION 5000
+#else
 #define IGNITER_DURATION 500
+#endif
+
 
 long ignition_time = 0;
 bool ignitor_active = false;
