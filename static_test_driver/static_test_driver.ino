@@ -129,6 +129,13 @@ void setup() {
   // Initialize serial
   while (!Serial);
   Serial.begin(115200);
+#if CONFIGURATION == DEMO
+  Serial.println(F("Demo static test driver"));
+#elif CONFIGURATION == MK_1
+  Serial.println(F("Mk 1 static test driver"));
+#elif CONFIGURATION == MK_2
+  Serial.println(F("Mk 2 static test driver"));
+#endif
   Serial.println(F("Initializing..."));
   
   // wait for chips to stabilize
