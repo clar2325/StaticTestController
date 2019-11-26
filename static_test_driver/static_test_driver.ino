@@ -42,8 +42,8 @@ int accel_error = 0;
 int temp_error[NUMBER_OF_TEMP_SENSORS] = {0,0};
 
 // Pressure Setup
-#define PRESSURE_FUEL A3
-#define PRESSURE_OX A2
+#define PRESSURE_FUEL A2
+#define PRESSURE_OX A3
 #define PRESSURE_NUM_HIST_VALS 10
 #define NUMBER_OF_PRESSURE_SENSORS 2
 
