@@ -33,6 +33,7 @@ float mean(const float *data, unsigned int size) {
 void error_check(const char *sensor_name, const char *sensor_type, int led, int &error, bool working) {
   if (working) {
     error = 0;
+    digitalWrite(led, HIGH);
   } else {
     if (!error) {
       Serial.print(sensor_name);
@@ -105,6 +106,7 @@ void init_force(int led, HX711 &scale) {
   
   // Calibrate load cell
   scale.set_scale(LOAD_CELL_CALIBRATION_FACTOR); // This value is obtained by using the SparkFun_HX711_Calibration sketch
+  scale.tare(); // Load Cell, Assuming there is no weight on the scale, reset to 0
 
   // Try reading a value from the load cell
   int error = 0;
