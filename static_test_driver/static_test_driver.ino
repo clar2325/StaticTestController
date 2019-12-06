@@ -245,8 +245,9 @@ void loop() {
       pressure_zero_ready = false;
       pressure_val_num = 0;
     }
-    else
+    else {
       Serial.println(F("Pressure zero values not ready"));
+    }
   }
   
   READ_FLAG(reset) {

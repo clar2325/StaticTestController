@@ -2,7 +2,7 @@
 #define PRESTAGE_PREP_TIME -500 // Time at which to open the prestage valves
 #define PRESTAGE_TIME      0
 #define MAINSTAGE_TIME     2000
-#define THRUST_CHECK_TIME  4000 // Time at which to start checking the engine is producing thrust, etc.
+#define THRUST_CHECK_TIME  6000 // Time at which to start checking the engine is producing thrust, etc.
 #define OX_LEADTIME        500  // Delay between closing oxygen and closing fuel prestage
 #define PRE_LEADTIME       1000 // Delay between closing oxygen prestage and closing both mainstage
 
