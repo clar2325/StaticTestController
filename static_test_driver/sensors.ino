@@ -6,7 +6,7 @@
 #define PRESSURE_MIN_VALID -100
 #define PRESSURE_MAX_VALID 1000
 
-#define TEMP_MIN_VALID 0
+#define TEMP_MIN_VALID -10
 #define TEMP_MAX_VALID 120
 
 #define ACCEL_MAX_VALID 20
@@ -59,23 +59,6 @@ float read_temp(const char *sensor_name, int led, int sensor, int &error) {
 float read_pressure(const char *sensor_name, int led, int sensor, int &error) {
   float result = (analogRead(sensor) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET;
   error_check(sensor_name, "pressure", led, error, result > PRESSURE_MIN_VALID && result < PRESSURE_MAX_VALID);
-  return result;
-}
-
-void init_thermocouple(const char *sensor_name, int led, Adafruit_MAX31855 &thermocouple) {
-  int error = 0;
-  read_thermocouple(sensor_name, led, thermocouple, error);
-  if (!error) {
-    Serial.print(sensor_name);
-    Serial.println(F(" theromocouple connected"));
-    digitalWrite(led, HIGH);
-  }
-  delay(100);
-}
-
-float read_thermocouple(const char *sensor_name, int led, Adafruit_MAX31855 &thermocouple, int &error) {
-  float result = thermocouple.readCelsius();
-  error_check(sensor_name, "thermocouple", led, error, !isnan(result) && result > 0);
   return result;
 }
 
@@ -136,5 +119,23 @@ float read_force(int led, HX711 &scale, int &error) {
     result = scale.get_units();
   }
   error_check("Force", "", led, error, is_ready && !isnan(result) && result > FORCE_MIN_VALID && result < FORCE_MAX_VALID);
+  return result;
+}
+
+void init_thermocouple(const char *sensor_name, int led, Adafruit_MAX31855 &thermocouple) {
+  int error = 0;
+  thermocouple.begin();
+  read_thermocouple(sensor_name, led, thermocouple, error);
+  if (!error) {
+    Serial.print(sensor_name);
+    Serial.println(F(" theromocouple connected"));
+    digitalWrite(led, HIGH);
+  }
+  delay(100);
+}
+
+float read_thermocouple(const char *sensor_name, int led, Adafruit_MAX31855 &thermocouple, int &error) {
+  float result = thermocouple.readCelsius();
+  error_check(sensor_name, "thermocouple", led, error, !isnan(result) && result > 0);
   return result;
 }

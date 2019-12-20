@@ -1,11 +1,10 @@
 #define DEMO 0
-#define MK_1 1
 #define MK_2 2
 
 // Change this line to set configuration
-#define CONFIGURATION MK_1
+#define CONFIGURATION MK_2
 
-#if !(CONFIGURATION == DEMO || CONFIGURATION == MK_1 || CONFIGURATION == MK_2)
+#if !(CONFIGURATION == DEMO || CONFIGURATION == MK_2)
 #error "Invalid configuration value"
 #endif
 
@@ -17,19 +16,6 @@
 #include <Adafruit_Sensor.h>
 #include <Telemetry.h>
 #include <avr/pgmspace.h>
-
-// LEDs
-#define THERMO1_LED 31
-#define THERMO2_LED 33
-#define THERMO3_LED 35
-#define ACCEL_LED 30
-#define FORCE_LED 28
-#define PRESSURE_FUEL_LED 36
-#define PRESSURE_OX_LED 50
-#define INLET_TEMP_LED 48
-#define OUTLET_TEMP_LED 46
-#define STATE_LED 38
-#define STATUS_LED 44
 
 // Accelerometer
 Adafruit_MMA8451 mma;
@@ -54,25 +40,32 @@ bool pressure_zero_ready = false;
 float pressure_zero_val[NUMBER_OF_PRESSURE_SENSORS] = {0,0};
 int pressure_error[NUMBER_OF_PRESSURE_SENSORS] = {0,0};
 
-// Thermocouple setup for MK_2
-#if CONFIGURATION == MK_2
-#define MAXDO   36
-#define MAXCLK  38
-#define MAXCS1  30
-#define MAXCS2  32
-#define MAXCS3  34
-Adafruit_MAX31855 chamber_thermocouple_1(MAXCLK, MAXCS1, MAXDO);
-Adafruit_MAX31855 chamber_thermocouple_2(MAXCLK, MAXCS2, MAXDO);
-Adafruit_MAX31855 chamber_thermocouple_3(MAXCLK, MAXCS3, MAXDO);
-#define NUMBER_OF_THERMOCOUPLES 3
-int thermocouple_error[NUMBER_OF_THERMOCOUPLES] = {0,0,0};
-#endif
-
 // Load cell setup
 #define LOAD_CELL_DOUT 2
 #define LOAD_CELL_CLK  26
 HX711 scale;
 int force_error = 0;
+
+// Thermocouple setup for MK_2
+#if CONFIGURATION == MK_2
+#define NUMBER_OF_THERMOCOUPLES 3
+// Using hardware SPI port: MISO=50, MOSI=51, SCK=52
+Adafruit_MAX31855 chamber_thermocouples[NUMBER_OF_THERMOCOUPLES] = {
+  Adafruit_MAX31855(-1), Adafruit_MAX31855(-1), Adafruit_MAX31855(-1) // TODO: Set these pin numbers
+};
+int thermocouple_error[NUMBER_OF_THERMOCOUPLES] = {0,0,0};
+#endif
+
+// LEDs
+#define ACCEL_LED 30
+#define FORCE_LED 28
+#define PRESSURE_FUEL_LED 36
+#define PRESSURE_OX_LED 50
+#define INLET_TEMP_LED 48
+#define OUTLET_TEMP_LED 46
+#define STATE_LED 38
+#define STATUS_LED 44
+const int THERMO_LEDS[NUMBER_OF_THERMOCOUPLES] = {31, 32, 33};
 
 // Sensor data
 #if CONFIGURATION == MK_2
@@ -98,9 +91,9 @@ char data_name[20] = "";
 void setup() {
   // Initialize LED pins to be outputs
 #if CONFIGURATION == MK_2
-  pinMode(THERMO1_LED, OUTPUT);
-  pinMode(THERMO2_LED, OUTPUT);
-  pinMode(THERMO3_LED, OUTPUT);
+  for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
+    pinMode(THERMO_LEDS[i], OUTPUT);
+  }
 #endif
   pinMode(ACCEL_LED, OUTPUT);
   pinMode(FORCE_LED, OUTPUT);
@@ -113,9 +106,9 @@ void setup() {
 
   // Initially turn on all the LEDs
 #if CONFIGURATION == MK_2
-  digitalWrite(THERMO1_LED, HIGH);
-  digitalWrite(THERMO2_LED, HIGH);
-  digitalWrite(THERMO3_LED, HIGH);
+  for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
+    digitalWrite(THERMO_LEDS[i], HIGH);
+  }
 #endif
   digitalWrite(ACCEL_LED, HIGH);
   digitalWrite(FORCE_LED, HIGH);
@@ -131,8 +124,6 @@ void setup() {
   Serial.begin(115200);
 #if CONFIGURATION == DEMO
   Serial.println(F("Demo static test driver"));
-#elif CONFIGURATION == MK_1
-  Serial.println(F("Mk 1 static test driver"));
 #elif CONFIGURATION == MK_2
   Serial.println(F("Mk 2 static test driver"));
 #endif
@@ -145,15 +136,17 @@ void setup() {
   pinMode(PRESSURE_FUEL, INPUT);
   pinMode(PRESSURE_OX, INPUT);
   
-  //Initialize Analog Temp Sensors
+  // Initialize Analog Temp Sensors
   pinMode(INLET_TEMP, INPUT);
   pinMode(OUTLET_TEMP, INPUT);
   
   // Initialize thermocouples for Mk.2
   #if CONFIGURATION == MK_2
-  init_thermocouple("Chamber 1", THERMO1_LED, chamber_thermocouple_1);
-  init_thermocouple("Chamber 2", THERMO2_LED, chamber_thermocouple_2);
-  init_thermocouple("Chamber 3", THERMO3_LED, chamber_thermocouple_3);  
+  char thermo_name[] = "Chamber n";
+  for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
+    thermo_name[8] = '1' + i;
+    init_thermocouple(thermo_name, THERMO_LEDS[i], chamber_thermocouples[i]);
+  }
   #endif
   
   // Initialize load cell
@@ -175,14 +168,16 @@ void loop() {
   
   // Grab thermocouple data for Mk.2
   #if CONFIGURATION == MK_2
-  chamber_temp[0] = read_thermocouple("Chamber 1", THERMO1_LED, chamber_thermocouple_1, thermocouple_error[0]);
-  chamber_temp[1] = read_thermocouple("Chamber 2", THERMO2_LED, chamber_thermocouple_2, thermocouple_error[1]);
-  chamber_temp[2] = read_thermocouple("Chamber 3", THERMO3_LED, chamber_thermocouple_3, thermocouple_error[2]);
+  char thermo_name[] = "Chamber n";
+  for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
+    thermo_name[8] = '1' + i;
+    chamber_temp[i] = read_thermocouple(thermo_name, THERMO_LEDS[i], chamber_thermocouples[i], thermocouple_error[i]);
+  }
   #endif
   
   // Grab pressure data
   pressure_fuel = read_pressure("Fuel", PRESSURE_FUEL_LED, PRESSURE_FUEL, pressure_error[0]);
-  pressure_ox = read_pressure("Oxygen", PRESSURE_OX_LED, PRESSURE_OX, pressure_error[0]);
+  pressure_ox = read_pressure("Oxygen", PRESSURE_OX_LED, PRESSURE_OX, pressure_error[1]);
   
   // Update pressure tare data
   pressure_hist_vals[0][pressure_val_num] = pressure_fuel;
@@ -211,20 +206,25 @@ void loop() {
 
   // Send collected data
   BEGIN_SEND
-  SEND_ITEM(force, force)
-  SEND_ITEM(acceleration, x)
-  SEND_GROUP_ITEM(y)
-  SEND_GROUP_ITEM(z)
-  SEND_ITEM(outlet_temperature, outlet_temp)
-  SEND_ITEM(inlet_temperature, inlet_temp)
-  SEND_ITEM(fuel_pressure, pressure_fuel)
-  SEND_ITEM(ox_pressure, pressure_ox)   
-  #if CONFIGURATION == MK_2
-  SEND_ITEM(chamber_temperature_1, chamber_temp[0])
-  SEND_ITEM(chamber_temperature_2, chamber_temp[2])
-  SEND_ITEM(chamber_temperature_3, chamber_temp[3])
-  #endif
-  SEND_ITEM(sensor_status, sensor_status)
+    SEND_ITEM(force, force)
+    SEND_ITEM(acceleration, x)
+    SEND_GROUP_ITEM(y)
+    SEND_GROUP_ITEM(z)
+    SEND_ITEM(outlet_temperature, outlet_temp)
+    SEND_ITEM(inlet_temperature, inlet_temp)
+    SEND_ITEM(fuel_pressure, pressure_fuel)
+    SEND_ITEM(ox_pressure, pressure_ox)
+    #if CONFIGURATION == MK_2
+    char chamber_temp_item_name[] = "chamber_temperature_n";
+    for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
+      chamber_temp_item_name[20] = '1' + i;
+      SEND_ITEM_NAME(chamber_temp_item_name, chamber_temp[i])
+    }
+    SEND_ITEM(chamber_temperature_1, chamber_temp[0])
+    SEND_ITEM(chamber_temperature_2, chamber_temp[1])
+    SEND_ITEM(chamber_temperature_3, chamber_temp[2])
+    #endif
+    SEND_ITEM(sensor_status, sensor_status)
   END_SEND
 
   // Read a command

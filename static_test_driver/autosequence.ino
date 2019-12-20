@@ -1,8 +1,8 @@
 // Timing
-#define PRESTAGE_PREP_TIME -500 // Time at which to open the prestage valves
+#define PRESTAGE_PREP_TIME 0 // Time at which to open the prestage valves
 #define PRESTAGE_TIME      0
-#define MAINSTAGE_TIME     2000
-#define THRUST_CHECK_TIME  6000 // Time at which to start checking the engine is producing thrust, etc.
+#define MAINSTAGE_TIME     0
+#define THRUST_CHECK_TIME  2000 // Time at which to start checking the engine is producing thrust, etc.
 #define OX_LEADTIME        500  // Delay between closing oxygen and closing fuel prestage
 #define PRE_LEADTIME       1000 // Delay between closing oxygen prestage and closing both mainstage
 
@@ -23,8 +23,6 @@
 // Min thrust that must be reached to avoid triggering a no-ignition shutdown
 #if CONFIGURATION == DEMO
 #define MIN_THRUST 50
-#elif CONFIGURATION == MK_1
-#define MIN_THRUST 20
 #elif CONFIGURATION == MK_2
 #define MIN_THRUST 1000
 #endif
