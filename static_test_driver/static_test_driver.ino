@@ -207,22 +207,19 @@ void loop() {
   // Send collected data
   BEGIN_SEND
     SEND_ITEM(force, force)
-    SEND_ITEM(acceleration, x)
+    SEND_ITEM(accel, x)
     SEND_GROUP_ITEM(y)
     SEND_GROUP_ITEM(z)
-    SEND_ITEM(outlet_temperature, outlet_temp)
-    SEND_ITEM(inlet_temperature, inlet_temp)
-    SEND_ITEM(fuel_pressure, pressure_fuel)
-    SEND_ITEM(ox_pressure, pressure_ox)
+    SEND_ITEM(outlet_temp, outlet_temp)
+    SEND_ITEM(inlet_temp, inlet_temp)
+    SEND_ITEM(fuel_press, pressure_fuel)
+    SEND_ITEM(ox_press, pressure_ox)
     #if CONFIGURATION == MK_2
-    char chamber_temp_item_name[] = "chamber_temperature_n";
+    char chamber_temp_item_name[] = "chamber_temp_n";
     for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
-      chamber_temp_item_name[20] = '1' + i;
+      chamber_temp_item_name[13] = '1' + i;
       SEND_ITEM_NAME(chamber_temp_item_name, chamber_temp[i])
     }
-    SEND_ITEM(chamber_temperature_1, chamber_temp[0])
-    SEND_ITEM(chamber_temperature_2, chamber_temp[1])
-    SEND_ITEM(chamber_temperature_3, chamber_temp[2])
     #endif
     SEND_ITEM(sensor_status, sensor_status)
   END_SEND
