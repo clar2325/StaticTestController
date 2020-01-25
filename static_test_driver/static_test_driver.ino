@@ -88,6 +88,9 @@ bool valve_status[] = {false, false, false, false};
 char data[10] = "";
 char data_name[20] = "";
 
+// Calling this performs a software reset of the board, reinitializing sensors
+void (*reset)(void) = 0;
+
 void setup() {
   // Initialize LED pins to be outputs
 #if CONFIGURATION == MK_2
@@ -249,7 +252,7 @@ void loop() {
   
   READ_FLAG(reset) {
     Serial.println(F("Resetting board"));
-    asm volatile("  jmp 0"); // Perform a software reset of the board, reinitializing sensors
+    reset();
   }
   READ_FLAG(start) {
     start_countdown();
