@@ -85,6 +85,9 @@ typedef enum {
 
 bool valve_status[] = {false, false, false, false};
 
+unsigned long last_heartbeat = 0;
+
+// Generally-used variables for parsing commands
 char data[10] = "";
 char data_name[20] = "";
 
@@ -250,6 +253,9 @@ void loop() {
     }
   }
   
+  READ_FLAG(heartbeat) {
+    heartbeat();
+  }
   READ_FLAG(reset) {
     Serial.println(F("Resetting board"));
     reset();

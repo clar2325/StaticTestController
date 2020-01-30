@@ -5,6 +5,7 @@
 #define THRUST_CHECK_TIME  2000 // Time at which to start checking the engine is producing thrust, etc.
 #define OX_LEADTIME        500  // Delay between closing oxygen and closing fuel prestage
 #define PRE_LEADTIME       1000 // Delay between closing oxygen prestage and closing both mainstage
+#define HEARTBEAT_TIMEOUT  1000 // Timeout to abort the run after not recieving a heartbeat signal
 
 #if CONFIGURATION == DEMO
 #define COUNTDOWN_DURATION 10000 // 10 sec
@@ -50,10 +51,15 @@ typedef enum {
 
 long start_time = 0;
 long shutdown_time = 0;
+long heartbeat_time = 0;
 state_t state = STAND_BY;
 
 void blink(int led, long period) {
   digitalWrite(led, (int)((millis() % (period * 2)) / period));
+}
+
+void heartbeat() {
+  heartbeat_time = millis();
 }
 
 void start_countdown() {
@@ -74,6 +80,7 @@ void start_countdown() {
     Serial.println(F("Countdown started"));
     SET_STATE(TERMINAL_COUNT)
     start_time = millis();
+    heartbeat();
   }
 }
 
@@ -98,7 +105,7 @@ void abort_autosequence() {
       SET_STATE(COOL_DOWN)
       shutdown_time = millis();
       break;
-      
+    
     case MAINSTAGE:
       set_valve(OX_PRE, 0);
       set_valve(FUEL_PRE, 0);
@@ -113,6 +120,13 @@ void run_control() {
   SEND(run_time, run_time)
 
   handle_igniter();
+
+#if CONFIGURATION == MK_2
+  if (state != STAND_BY && state != COOL_DOWN && millis() > heartbeat_time + HEARTBEAT_TIMEOUT) {
+    Serial.println(F("Loss of data link"));
+    abort_autosequence();
+  }
+#endif
 
   switch (state) {
     case STAND_BY:
