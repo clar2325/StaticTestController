@@ -14,6 +14,7 @@
 #include <Adafruit_MMA8451.h>
 #include <Adafruit_MAX31855.h>
 #include <Adafruit_Sensor.h>
+#include <Adafruit_LiquidCrystal.h>
 #include <Telemetry.h>
 #include <avr/pgmspace.h>
 
@@ -56,6 +57,10 @@ Adafruit_MAX31855 chamber_thermocouples[NUMBER_OF_THERMOCOUPLES] = {
 int thermocouple_error[NUMBER_OF_THERMOCOUPLES] = {0,0,0};
 #endif
 
+// LCD
+// Connect via i2c, default address #0 (A0-A2 not jumpered)
+Adafruit_LiquidCrystal lcd(0);
+
 // LEDs
 #define ACCEL_LED 30
 #define FORCE_LED 28
@@ -65,7 +70,9 @@ int thermocouple_error[NUMBER_OF_THERMOCOUPLES] = {0,0,0};
 #define OUTLET_TEMP_LED 46
 #define STATE_LED 38
 #define STATUS_LED 44
+#if CONFIGURATION == MK_2
 const int THERMO_LEDS[NUMBER_OF_THERMOCOUPLES] = {31, 32, 33};
+#endif
 
 // Sensor data
 #if CONFIGURATION == MK_2
@@ -95,6 +102,10 @@ char data_name[20] = "";
 void (*reset)(void) = 0;
 
 void setup() {
+  // Initialize LCD, set up the number of rows and columns
+  lcd.begin(16, 2);
+  set_lcd_status("Initializing...");
+  
   // Initialize LED pins to be outputs
 #if CONFIGURATION == MK_2
   for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
@@ -164,6 +175,9 @@ void setup() {
 
   // Initialize engine controls
   init_engine();
+
+  // Set initial state
+  init_autosequence();
   
   Serial.println("Setup Complete");
 }

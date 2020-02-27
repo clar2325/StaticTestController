@@ -44,15 +44,21 @@ typedef enum {
 } state_t;
 
 // Convenience
-#define SET_STATE(STATE) {\
-    state = STATE;          \
-    SEND(status, #STATE);   \
+#define SET_STATE(STATE) {    \
+    state = STATE;            \
+    write_state(#STATE);      \
   }
+  
 
 long start_time = 0;
 long shutdown_time = 0;
 long heartbeat_time = 0;
 state_t state = STAND_BY;
+
+void write_state(const char *state_name) {
+  set_lcd_status(state_name);
+  SEND(status, state_name);
+}
 
 void blink(int led, long period) {
   digitalWrite(led, (int)((millis() % (period * 2)) / period));
@@ -60,6 +66,10 @@ void blink(int led, long period) {
 
 void heartbeat() {
   heartbeat_time = millis();
+}
+
+void init_autosequence() {
+  SET_STATE(STAND_BY);
 }
 
 void start_countdown() {
@@ -132,6 +142,9 @@ void run_control() {
     case STAND_BY:
       // State that waits for a person to begin the test
       digitalWrite(STATE_LED, LOW);
+      if (!sensor_status) {
+        set_lcd_status("Sensor failure");
+      }
       break;
     case TERMINAL_COUNT:
       // Countdown state
