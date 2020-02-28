@@ -141,14 +141,12 @@ void run_control() {
   switch (state) {
     case STAND_BY:
       // State that waits for a person to begin the test
-      digitalWrite(STATE_LED, LOW);
       if (!sensor_status) {
         set_lcd_status("Sensor failure");
       }
       break;
     case TERMINAL_COUNT:
       // Countdown state
-      blink(STATE_LED, TERMINAL_COUNT_LED_PERIOD);
       #if CONFIGURATION != DEMO
       if (!sensor_status) {
         Serial.println(F("Sensor failure"));
@@ -164,7 +162,6 @@ void run_control() {
       break;
     case PRESTAGE_READY:
       // State to wait for ignition after prestage valves are open
-      digitalWrite(STATE_LED, HIGH);
       if (run_time >= PRESTAGE_TIME) {
         SET_STATE(PRESTAGE)
         fire_igniter();
@@ -172,7 +169,6 @@ void run_control() {
       break;
     case PRESTAGE:
       // State to wait for mainstage valves to be opened after ignition
-      digitalWrite(STATE_LED, HIGH);
       if (run_time >= MAINSTAGE_TIME) {
         SET_STATE(MAINSTAGE)
         set_valve(FUEL_MAIN, 1);
@@ -181,7 +177,6 @@ void run_control() {
       break;
     case MAINSTAGE:
       // State for active firing of the engine
-      digitalWrite(STATE_LED, HIGH);
       #if CONFIGURATION != DEMO
       // Check that the sensors are still working
       if (!sensor_status) {
@@ -210,7 +205,6 @@ void run_control() {
 
     case OXYGEN_SHUTDOWN:
       // Oxygen prestage valve is closed, others are still open
-      digitalWrite(STATE_LED, LOW);
       if (millis() >= shutdown_time + OX_LEADTIME) {
         set_valve(FUEL_PRE, 0);
         SET_STATE(SHUTDOWN)
@@ -219,7 +213,6 @@ void run_control() {
 
     case SHUTDOWN:
       // Both prestage valves are closed, others may still be open
-      digitalWrite(STATE_LED, LOW);
       if (millis() >= shutdown_time + PRE_LEADTIME) {
         set_valve(OX_MAIN, 0);
         set_valve(FUEL_MAIN, 0);
@@ -229,7 +222,6 @@ void run_control() {
 
     case COOL_DOWN:
       // State that waits for cool-down to take place after a run is complete
-      blink(STATE_LED, COOL_DOWN_LED_PERIOD);
       if (millis() - shutdown_time >= COOLDOWN_TIME) {
         Serial.println(F("Run finished"));
         SET_STATE(STAND_BY)

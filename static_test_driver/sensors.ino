@@ -9,8 +9,6 @@
 #define TEMP_MIN_VALID -10
 #define TEMP_MAX_VALID 120
 
-#define ACCEL_MAX_VALID 20
-
 #define FORCE_MIN_VALID -50
 #define FORCE_MAX_VALID 500
 
@@ -23,6 +21,8 @@
 #define LOAD_CELL_RETRY_INTERVAL 10
 #define LOAD_CELL_MAX_RETRIES 20
 
+String sensor_errors = "";
+
 float mean(const float *data, unsigned int size) {
   float result = 0;
   for (int i = 0; i < size; i++)
@@ -30,39 +30,47 @@ float mean(const float *data, unsigned int size) {
   return result / size;
 }
 
-void error_check(const char *sensor_name, const char *sensor_type, int led, int &error, bool working) {
+void update_sensor_errors() {
+  set_lcd_errors(sensor_errors);
+  sensor_errors = "";
+}
+
+void error_check(int &error, bool working, const String &sensor_type, const String &sensor_name="", const String &sensor_short_name="") {
   if (working) {
     error = 0;
-    digitalWrite(led, HIGH);
   } else {
+    if (sensor_errors.length()) {
+      sensor_errors += ',';
+    }
+    sensor_errors += sensor_type.substring(0, min(sensor_type.length(), 2)) + sensor_short_name;
     if (!error) {
       Serial.print(sensor_name);
-      Serial.print(' ');
+      if (sensor_name.length()) {
+        Serial.print(' ');
+      }
       Serial.print(sensor_type);
       Serial.println(F(" sensor error"));
     }
     error++;
     if (error > SENSOR_ERROR_LIMIT) {
       sensor_status = false;
-      digitalWrite(STATUS_LED, false);
     }
-    digitalWrite(led, LOW);
   }
 }
 
-float read_temp(const char *sensor_name, int led, int sensor, int &error) {
+float read_temp(int sensor, int &error, const String &sensor_name, const String &sensor_short_name) {
   float result = analogRead(sensor) * 5.0 * 100 / 1024;
-  error_check(sensor_name, "temp", led, error, result > TEMP_MIN_VALID && result < TEMP_MAX_VALID);
+  error_check(error, result > TEMP_MIN_VALID && result < TEMP_MAX_VALID, "temp", sensor_name, sensor_short_name);
   return result;
 }
 
-float read_pressure(const char *sensor_name, int led, int sensor, int &error) {
+float read_pressure(int sensor, int &error, const String &sensor_name, const String &sensor_short_name) {
   float result = (analogRead(sensor) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET;
-  error_check(sensor_name, "pressure", led, error, result > PRESSURE_MIN_VALID && result < PRESSURE_MAX_VALID);
+  error_check(error, result > PRESSURE_MIN_VALID && result < PRESSURE_MAX_VALID, sensor_name, "pressure");
   return result;
 }
 
-void init_accelerometer(int led, Adafruit_MMA8451 &mma) {
+void init_accelerometer(Adafruit_MMA8451 &mma) {
   bool working = false;
   if (mma.begin()) {
     mma.setRange(MMA8451_RANGE_2_G);  // set acc range (2 4 8)
@@ -72,19 +80,19 @@ void init_accelerometer(int led, Adafruit_MMA8451 &mma) {
     working = true;
   }
   int error = 0;
-  error_check("Accelerometer", "", led, error, working);
+  error_check(error, working, "accelerometer");
   delay(100);
 }
 
-sensors_vec_t read_accelerometer(int led, Adafruit_MMA8451 &mma, int &error) {
+sensors_vec_t read_accelerometer(Adafruit_MMA8451 &mma, int &error) {
   sensors_event_t event;
   mma.getEvent(&event);
   sensors_vec_t accel = event.acceleration;
-  error_check("Accelerometer", "", led, error, abs(accel.x) < ACCEL_MAX_VALID * 2 && abs(accel.y) < ACCEL_MAX_VALID * 2 && abs(accel.z) < ACCEL_MAX_VALID * 2);
+  error_check(error, !(mma.x == -1 && mma.y == -1 && mma.z == -1), "accelerometer");
   return accel;
 }
 
-void init_force(int led, HX711 &scale) {
+void init_force(HX711 &scale) {
   scale.begin(LOAD_CELL_DOUT, LOAD_CELL_CLK);
   
   // Calibrate load cell
@@ -93,16 +101,15 @@ void init_force(int led, HX711 &scale) {
 
   // Try reading a value from the load cell
   int error = 0;
-  read_force(led, scale, error);
+  read_force(scale, error);
   
   if (!error) {
     Serial.println(F("Load cell amp connected"));
-    digitalWrite(led, HIGH);
   }
   delay(100);
 }
 
-float read_force(int led, HX711 &scale, int &error) {
+float read_force(HX711 &scale, int &error) {
   // Wait for load cell data to become ready
   bool is_ready = false;
   for (unsigned i = 0; i < LOAD_CELL_MAX_RETRIES; i++) {
@@ -118,24 +125,23 @@ float read_force(int led, HX711 &scale, int &error) {
   if (is_ready) {
     result = scale.get_units();
   }
-  error_check("Force", "", led, error, is_ready && !isnan(result) && result > FORCE_MIN_VALID && result < FORCE_MAX_VALID);
+  error_check(error, is_ready && !isnan(result) && result > FORCE_MIN_VALID && result < FORCE_MAX_VALID, "Force");
   return result;
 }
 
-void init_thermocouple(const char *sensor_name, int led, Adafruit_MAX31855 &thermocouple) {
+void init_thermocouple(Adafruit_MAX31855 &thermocouple, const String &sensor_name, const String &sensor_short_name) {
   int error = 0;
   thermocouple.begin();
-  read_thermocouple(sensor_name, led, thermocouple, error);
+  read_thermocouple(thermocouple, error, sensor_name, sensor_short_name);
   if (!error) {
     Serial.print(sensor_name);
     Serial.println(F(" theromocouple connected"));
-    digitalWrite(led, HIGH);
   }
   delay(100);
 }
 
-float read_thermocouple(const char *sensor_name, int led, Adafruit_MAX31855 &thermocouple, int &error) {
+float read_thermocouple(Adafruit_MAX31855 &thermocouple, int &error, const String &sensor_name, const String &sensor_short_name) {
   float result = thermocouple.readCelsius();
-  error_check(sensor_name, "thermocouple", led, error, !isnan(result) && result > 0);
+  error_check(error, !isnan(result) && result > 0, "thermocouple", sensor_name, sensor_short_name);
   return result;
 }

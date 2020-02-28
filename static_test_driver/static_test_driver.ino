@@ -61,19 +61,6 @@ int thermocouple_error[NUMBER_OF_THERMOCOUPLES] = {0,0,0};
 // Connect via i2c, default address #0 (A0-A2 not jumpered)
 Adafruit_LiquidCrystal lcd(0);
 
-// LEDs
-#define ACCEL_LED 30
-#define FORCE_LED 28
-#define PRESSURE_FUEL_LED 36
-#define PRESSURE_OX_LED 50
-#define INLET_TEMP_LED 48
-#define OUTLET_TEMP_LED 46
-#define STATE_LED 38
-#define STATUS_LED 44
-#if CONFIGURATION == MK_2
-const int THERMO_LEDS[NUMBER_OF_THERMOCOUPLES] = {31, 32, 33};
-#endif
-
 // Sensor data
 #if CONFIGURATION == MK_2
 float chamber_temp[NUMBER_OF_THERMOCOUPLES];
@@ -105,36 +92,6 @@ void setup() {
   // Initialize LCD, set up the number of rows and columns
   lcd.begin(16, 2);
   set_lcd_status("Initializing...");
-  
-  // Initialize LED pins to be outputs
-#if CONFIGURATION == MK_2
-  for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
-    pinMode(THERMO_LEDS[i], OUTPUT);
-  }
-#endif
-  pinMode(ACCEL_LED, OUTPUT);
-  pinMode(FORCE_LED, OUTPUT);
-  pinMode(INLET_TEMP_LED, OUTPUT);
-  pinMode(OUTLET_TEMP_LED, OUTPUT);
-  pinMode(PRESSURE_FUEL_LED, OUTPUT);
-  pinMode(PRESSURE_OX_LED, OUTPUT);
-  pinMode(STATE_LED, OUTPUT);
-  pinMode(STATUS_LED, OUTPUT);
-
-  // Initially turn on all the LEDs
-#if CONFIGURATION == MK_2
-  for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
-    digitalWrite(THERMO_LEDS[i], HIGH);
-  }
-#endif
-  digitalWrite(ACCEL_LED, HIGH);
-  digitalWrite(FORCE_LED, HIGH);
-  digitalWrite(INLET_TEMP_LED, HIGH);
-  digitalWrite(OUTLET_TEMP_LED, HIGH);
-  digitalWrite(PRESSURE_FUEL_LED, HIGH);
-  digitalWrite(PRESSURE_OX_LED, HIGH);
-  digitalWrite(STATE_LED, HIGH);
-  digitalWrite(STATUS_LED, HIGH);
 
   // Initialize serial
   while (!Serial);
@@ -157,21 +114,22 @@ void setup() {
   pinMode(INLET_TEMP, INPUT);
   pinMode(OUTLET_TEMP, INPUT);
   
-  // Initialize thermocouples for Mk.2
-  #if CONFIGURATION == MK_2
-  char thermo_name[] = "Chamber n";
-  for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
-    thermo_name[8] = '1' + i;
-    init_thermocouple(thermo_name, THERMO_LEDS[i], chamber_thermocouples[i]);
-  }
-  #endif
-  
   // Initialize load cell
-  init_force(FORCE_LED, scale);
+  init_force(scale);
   
   // Initialize accelerometer
   Wire.begin();
-  init_accelerometer(ACCEL_LED, mma);
+  init_accelerometer(mma);
+  
+  // Initialize thermocouples for Mk.2
+  #if CONFIGURATION == MK_2
+  char thermo_name[] = "chamber n";
+  char thermo_short_name[] = "n";
+  for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
+    thermo_name[8] = thermo_short_name[0] = '1' + i;
+    init_thermocouple(chamber_thermocouples[i], thermo_name, thermo_short_name);
+  }
+  #endif
 
   // Initialize engine controls
   init_engine();
@@ -184,20 +142,11 @@ void setup() {
 
 void loop() {
   // Grab force data
-  force = read_force(FORCE_LED, scale, force_error); // Force is measured in lbs
-  
-  // Grab thermocouple data for Mk.2
-  #if CONFIGURATION == MK_2
-  char thermo_name[] = "Chamber n";
-  for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
-    thermo_name[8] = '1' + i;
-    chamber_temp[i] = read_thermocouple(thermo_name, THERMO_LEDS[i], chamber_thermocouples[i], thermocouple_error[i]);
-  }
-  #endif
+  force = read_force(scale, force_error); // Force is measured in lbs
   
   // Grab pressure data
-  pressure_fuel = read_pressure("Fuel", PRESSURE_FUEL_LED, PRESSURE_FUEL, pressure_error[0]);
-  pressure_ox = read_pressure("Oxygen", PRESSURE_OX_LED, PRESSURE_OX, pressure_error[1]);
+  pressure_fuel = read_pressure(PRESSURE_FUEL, pressure_error[0], "fuel", "Fl");
+  pressure_ox = read_pressure(PRESSURE_OX, pressure_error[1], "oxygen", "Ox");
   
   // Update pressure tare data
   pressure_hist_vals[0][pressure_val_num] = pressure_fuel;
@@ -214,12 +163,25 @@ void loop() {
   }
   
   // Grab analog temperature data
-  inlet_temp = read_temp("Inlet", INLET_TEMP_LED, INLET_TEMP, temp_error[0]);
-  outlet_temp = read_temp("Outlet", OUTLET_TEMP_LED, OUTLET_TEMP, temp_error[1]);
+  inlet_temp = read_temp(INLET_TEMP, temp_error[0], "inlet", "In");
+  outlet_temp = read_temp(OUTLET_TEMP, temp_error[1], "outlet", "Out");
   
   // Grab accelerometer data (acceleration is measured in m/s^2)
-  sensors_vec_t accel = read_accelerometer(ACCEL_LED, mma, accel_error);
+  sensors_vec_t accel = read_accelerometer(mma, accel_error);
   x=accel.x;  y=accel.y;  z=accel.z;
+  
+  // Grab thermocouple data for Mk.2
+  #if CONFIGURATION == MK_2
+  char thermo_name[] = "chamber n";
+  char thermo_short_name[] = "n";
+  for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
+    thermo_name[8] = thermo_short_name[0] = '1' + i;
+    chamber_temp[i] = read_thermocouple(chamber_thermocouples[i], thermocouple_error[i], thermo_name, thermo_short_name);
+  }
+  #endif
+
+  // Update sensor diagnostic message on LCD
+  update_sensor_errors();
   
   // Run autonomous control
   run_control();
