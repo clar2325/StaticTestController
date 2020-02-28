@@ -25,21 +25,23 @@ int accel_error = 0;
 // Analog Temperature Setup
 #define INLET_TEMP A5
 #define OUTLET_TEMP A4
-#define NUMBER_OF_TEMP_SENSORS 2
+#define NUMBER_OF_TEMP_SENSORS 4
 int temp_error[NUMBER_OF_TEMP_SENSORS] = {0,0};
 
 // Pressure Setup
-#define PRESSURE_FUEL A2
-#define PRESSURE_OX A3
+#define PRESSURE_FUEL A0
+#define PRESSURE_OX A1
+#define PRESSURE_FUEL_INJECTOR A2
+#define PRESSURE_OX_INJECTOR A3
 #define PRESSURE_NUM_HIST_VALS 10
-#define NUMBER_OF_PRESSURE_SENSORS 2
+#define NUMBER_OF_PRESSURE_SENSORS 4
 
 // Pressure sensor 0 = Fuel, Pressure sensor 1 = Oxidizer
 float pressure_hist_vals[NUMBER_OF_PRESSURE_SENSORS][PRESSURE_NUM_HIST_VALS];
 int pressure_val_num = 0;
 bool pressure_zero_ready = false;
-float pressure_zero_val[NUMBER_OF_PRESSURE_SENSORS] = {0,0};
-int pressure_error[NUMBER_OF_PRESSURE_SENSORS] = {0,0};
+float pressure_zero_val[NUMBER_OF_PRESSURE_SENSORS] = {0,0,0,0};
+int pressure_error[NUMBER_OF_PRESSURE_SENSORS] = {0,0,0,0};
 
 // Load cell setup
 #define LOAD_CELL_DOUT 2
@@ -65,7 +67,7 @@ Adafruit_LiquidCrystal lcd(0);
 #if CONFIGURATION == MK_2
 float chamber_temp[NUMBER_OF_THERMOCOUPLES];
 #endif
-float pressure_fuel, pressure_ox, force, x,y,z, inlet_temp, outlet_temp;
+float pressure_fuel, pressure_ox, pressure_fuel_injector, pressure_ox_injector, force, x,y,z, inlet_temp, outlet_temp;
 
 bool sensor_status = true;
 
@@ -109,6 +111,8 @@ void setup() {
   // Initialize Pressure Sensors
   pinMode(PRESSURE_FUEL, INPUT);
   pinMode(PRESSURE_OX, INPUT);
+  pinMode(PRESSURE_FUEL_INJECTOR, INPUT);
+  pinMode(PRESSURE_OX_INJECTOR, INPUT);
   
   // Initialize Analog Temp Sensors
   pinMode(INLET_TEMP, INPUT);
@@ -147,14 +151,20 @@ void loop() {
   // Grab pressure data
   pressure_fuel = read_pressure(PRESSURE_FUEL, pressure_error[0], "fuel", "Fl");
   pressure_ox = read_pressure(PRESSURE_OX, pressure_error[1], "oxygen", "Ox");
+  pressure_fuel_injector = read_pressure(PRESSURE_FUEL_INJECTOR, pressure_error[2], "injector fuel", "FlE");
+  pressure_ox_injector = read_pressure(PRESSURE_OX_INJECTOR, pressure_error[3], "injector oxygen", "OxE");
   
   // Update pressure tare data
   pressure_hist_vals[0][pressure_val_num] = pressure_fuel;
   pressure_hist_vals[1][pressure_val_num] = pressure_ox;
+  pressure_hist_vals[2][pressure_val_num] = pressure_fuel_injector;
+  pressure_hist_vals[3][pressure_val_num] = pressure_ox_injector;
   
   // Tare pressures
   pressure_fuel -= pressure_zero_val[0];
   pressure_ox -= pressure_zero_val[1];
+  pressure_fuel_injector -= pressure_zero_val[2];
+  pressure_ox_injector -= pressure_zero_val[3];
   
   pressure_val_num++;
   if (pressure_val_num >= PRESSURE_NUM_HIST_VALS) {
@@ -196,6 +206,8 @@ void loop() {
     SEND_ITEM(inlet_temp, inlet_temp)
     SEND_ITEM(fuel_press, pressure_fuel)
     SEND_ITEM(ox_press, pressure_ox)
+    SEND_ITEM(fuel_inj_press, pressure_fuel_injector)
+    SEND_ITEM(ox_inj_press, pressure_ox_injector)
     #if CONFIGURATION == MK_2
     char chamber_temp_item_name[] = "chamber_temp_n";
     for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
