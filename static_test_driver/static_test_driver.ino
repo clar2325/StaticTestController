@@ -54,7 +54,7 @@ int force_error = 0;
 #define NUMBER_OF_THERMOCOUPLES 3
 // Using hardware SPI port: MISO=50, MOSI=51, SCK=52
 Adafruit_MAX31855 chamber_thermocouples[NUMBER_OF_THERMOCOUPLES] = {
-  Adafruit_MAX31855(-1), Adafruit_MAX31855(-1), Adafruit_MAX31855(-1) // TODO: Set these pin numbers
+  Adafruit_MAX31855(45), Adafruit_MAX31855(46), Adafruit_MAX31855(47) // Pins 45-49 reserved for CS
 };
 int thermocouple_error[NUMBER_OF_THERMOCOUPLES] = {0,0,0};
 #endif
