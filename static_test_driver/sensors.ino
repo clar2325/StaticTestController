@@ -21,12 +21,15 @@
 #define LOAD_CELL_RETRY_INTERVAL 10
 #define LOAD_CELL_MAX_RETRIES 20
 
-//Error Checking function revisions.
-#define LOAD_CELL_IDENTITY 100
-#define THERMOCOUPLE_IDENTITY 200
-#define PRESSURE_TRANSDUCER_IDENTITY 300
+
 
 String sensor_errors = "";
+
+//Number of Sensors 
+//Load Cells - 4
+//Pressure Transducers - 4
+//Thermocouples - n/a (not a priority)
+//Accelerometer - probably 1 so no need to work on that too much.
 
 //-------------------------------------------------------------------------------------------
 //Utility Functions
@@ -48,12 +51,12 @@ void error_check(int &error, bool working, const String &sensor_type, const Stri
   if (working) {
     error = 0;
   } else {
-    if (sensor_errors.length()) {
+    if (sensor_errors.length()) { 
       sensor_errors += ',';
     }
     sensor_errors += sensor_type.substring(0, min(sensor_type.length(), 2)) + sensor_short_name;
-    if (!error) { //if its not working and error = 0 (so like first error in the run through) then we do this 
-      Serial.print(sensor_name);
+    if (!error) { 
+      Serial.print(sensor_name);    
       if (sensor_name.length()) {
         Serial.print(' ');
       }
@@ -61,11 +64,14 @@ void error_check(int &error, bool working, const String &sensor_type, const Stri
       Serial.println(F(" sensor error"));
     }
     error++;
-    if (error > SENSOR_ERROR_LIMIT) {
+    if (error > SENSOR_ERROR_LIMIT) {     
       sensor_status = false; //static_test_driver
     }
+
+   
   }
 }
+
 
 //-------------------------------------------------------------------------------------------
 //LoadCell 
@@ -129,11 +135,13 @@ float LoadCell::read_force() {
   return result;
 }
 
+
 //-------------------------------------------------------------------------------------------
 //Thermocouple 
 //-------------------------------------------------------------------------------------------
 
 //SENSOR DEVICE 2
+
 
 class Thermocouple 
 {
@@ -176,6 +184,8 @@ float Thermocouple::read_thermocouple() {
   return result;
 }
 
+
+
 //-------------------------------------------------------------------------------------------
 //Pressure Transducers
 //-------------------------------------------------------------------------------------------
@@ -191,13 +201,13 @@ class PressureTransducer
   const String m_sensor_short_name;
   PressureTransducer(int pin, const String& name, const String& shortname) : m_pressurepin{pin}, m_sensor_name{name}, m_sensor_short_name{shortname} , m_error{0} {} 
 
-  float read_pressure(int sensor, int &error, const String &sensor_name, const String &sensor_short_name);
+  float read_pressure(int sensor);
   
 };
 
-float PressureTransducer::read_pressure(int sensor, int &error, const String &sensor_name, const String &sensor_short_name) {
+float PressureTransducer::read_pressure(int sensor) {
   float result = (analogRead(sensor) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET;
-  error_check(error, result > PRESSURE_MIN_VALID && result < PRESSURE_MAX_VALID, sensor_name, "pressure");
+  error_check(m_error, result > PRESSURE_MIN_VALID && result < PRESSURE_MAX_VALID, m_sensor_name, "pressure");
   return result;
 };
 
