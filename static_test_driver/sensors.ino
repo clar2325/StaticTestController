@@ -26,7 +26,6 @@
 #define THERMOCOUPLE_IDENTITY 200
 #define PRESSURE_TRANSDUCER_IDENTITY 300
 
-
 String sensor_errors = "";
 
 //Number of Sensors 
