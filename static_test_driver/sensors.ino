@@ -28,12 +28,6 @@
 
 String sensor_errors = "";
 
-//Number of Sensors 
-//Load Cells - 4
-//Pressure Transducers - 4
-//Thermocouples - n/a (not a priority)
-//Accelerometer - probably 1 so no need to work on that too much.
-
 //-------------------------------------------------------------------------------------------
 //Utility Functions
 //-------------------------------------------------------------------------------------------
@@ -72,7 +66,6 @@ void error_check(int &error, bool working, const String &sensor_type, const Stri
     }
   }
 }
-
 
 //-------------------------------------------------------------------------------------------
 //LoadCell 
@@ -136,13 +129,11 @@ float LoadCell::read_force() {
   return result;
 }
 
-
 //-------------------------------------------------------------------------------------------
 //Thermocouple 
 //-------------------------------------------------------------------------------------------
 
 //SENSOR DEVICE 2
-
 
 class Thermocouple 
 {
@@ -184,8 +175,6 @@ float Thermocouple::read_thermocouple() {
   error_check(m_error, !isnan(result) && result > 0, "thermocouple", m_sensor_name, m_sensor_short_name);
   return result;
 }
-
-
 
 //-------------------------------------------------------------------------------------------
 //Pressure Transducers
