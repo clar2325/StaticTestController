@@ -28,6 +28,17 @@ int accel_error = 0;
 #define NUMBER_OF_TEMP_SENSORS 4
 int temp_error[NUMBER_OF_TEMP_SENSORS] = {0,0};
 
+// Igniter pin assignment
+uint8_t IGNITER_PIN = 15;
+
+// Valve pin assignment
+#define FUEL_PRE_PIN 34;
+#define FUEL_MAIN_PIN 33;
+#define OX_PRE_PIN 32;
+#define OX_MAIN_PIN 31;
+#define N2_CHOKE_PIN 30;
+#define N2_DRAIN_PIN 29;
+
 // Pressure Setup
 #define PRESSURE_FUEL A0
 #define PRESSURE_OX A1
@@ -44,8 +55,15 @@ float pressure_zero_val[NUMBER_OF_PRESSURE_SENSORS] = {0,0,0,0};
 int pressure_error[NUMBER_OF_PRESSURE_SENSORS] = {0,0,0,0};
 
 // Load cell setup
-#define LOAD_CELL_DOUT 2
-#define LOAD_CELL_CLK  26
+#define LOAD_CELL_1_DOUT 11
+#define LOAD_CELL_1_CLK 7
+#define LOAD_CELL_2_DOUT 10
+#define LOAD_CELL_2_CLK 6
+#define LOAD_CELL_3_DOUT 9
+#define LOAD_CELL_3_CLK 5
+#define LOAD_CELL_4_DOUT 8
+#define LOAD_CELL_4_CLK 4
+
 HX711 scale;
 int force_error = 0;
 
@@ -76,10 +94,12 @@ typedef enum {
   FUEL_PRE,
   FUEL_MAIN,
   OX_PRE,
-  OX_MAIN
+  OX_MAIN,
+  N2_CHOKE,
+  N2_DRAIN
 } valve_t;
 
-bool valve_status[] = {false, false, false, false};
+bool valve_status[] = {false, false, false, false, false, false};
 
 unsigned long last_heartbeat = 0;
 
@@ -104,27 +124,34 @@ void setup() {
   Serial.println(F("Mk 2 static test driver"));
 #endif
   Serial.println(F("Initializing..."));
-  
+
   // wait for chips to stabilize
   delay(500);
-  
+
   // Initialize Pressure Sensors
   pinMode(PRESSURE_FUEL, INPUT);
   pinMode(PRESSURE_OX, INPUT);
   pinMode(PRESSURE_FUEL_INJECTOR, INPUT);
   pinMode(PRESSURE_OX_INJECTOR, INPUT);
-  
+
   // Initialize Analog Temp Sensors
   pinMode(INLET_TEMP, INPUT);
   pinMode(OUTLET_TEMP, INPUT);
-  
+
   // Initialize load cell
-  init_force(scale);
-  
+  pinMode(LOAD_CELL_1_DOUT, INPUT);
+  pinMode(LOAD_CELL_2_DOUT, INPUT);
+  pinMode(LOAD_CELL_3_DOUT, INPUT);
+  pinMode(LOAD_CELL_4_DOUT, INPUT);
+  init_force(LOAD_CELL_1_DOUT, LOAD_CELL_1_CLK);
+  init_force(LOAD_CELL_2_DOUT, LOAD_CELL_2_CLK);
+  init_force(LOAD_CELL_3_DOUT, LOAD_CELL_3_CLK);
+  init_force(LOAD_CELL_4_DOUT, LOAD_CELL_4_CLK);
+
   // Initialize accelerometer
   Wire.begin();
   init_accelerometer(mma);
-  
+
   // Initialize thermocouples for Mk.2
   #if CONFIGURATION == MK_2
   char thermo_name[] = "chamber n";
@@ -135,51 +162,59 @@ void setup() {
   }
   #endif
 
-  // Initialize engine controls
-  init_engine();
+  // Initialize valves
+  init_valve(FUEL_PRE_PIN);
+  init_valve(FUEL_MAIN_PIN);
+  init_valve(OX_PRE_PIN);
+  init_valve(OX_MAIN_PIN);
+  init_valve(N2_CHOKE_PIN);
+  init_valve(N2_DRAIN_PIN);
+
+  // Initialize igniter
+  init_igniter(IGNITER_PIN);
 
   // Set initial state
   init_autosequence();
-  
+
   Serial.println("Setup Complete");
 }
 
 void loop() {
   // Grab force data
   force = read_force(scale, force_error); // Force is measured in lbs
-  
+
   // Grab pressure data
   pressure_fuel = read_pressure(PRESSURE_FUEL, pressure_error[0], "fuel", "Fl");
   pressure_ox = read_pressure(PRESSURE_OX, pressure_error[1], "oxygen", "Ox");
   pressure_fuel_injector = read_pressure(PRESSURE_FUEL_INJECTOR, pressure_error[2], "injector fuel", "FlE");
   pressure_ox_injector = read_pressure(PRESSURE_OX_INJECTOR, pressure_error[3], "injector oxygen", "OxE");
-  
+
   // Update pressure tare data
   pressure_hist_vals[0][pressure_val_num] = pressure_fuel;
   pressure_hist_vals[1][pressure_val_num] = pressure_ox;
   pressure_hist_vals[2][pressure_val_num] = pressure_fuel_injector;
   pressure_hist_vals[3][pressure_val_num] = pressure_ox_injector;
-  
+
   // Tare pressures
   pressure_fuel -= pressure_zero_val[0];
   pressure_ox -= pressure_zero_val[1];
   pressure_fuel_injector -= pressure_zero_val[2];
   pressure_ox_injector -= pressure_zero_val[3];
-  
+
   pressure_val_num++;
   if (pressure_val_num >= PRESSURE_NUM_HIST_VALS) {
     pressure_val_num = 0;
     pressure_zero_ready = true;
   }
-  
+
   // Grab analog temperature data
   inlet_temp = read_temp(INLET_TEMP, temp_error[0], "inlet", "In");
   outlet_temp = read_temp(OUTLET_TEMP, temp_error[1], "outlet", "Out");
-  
+
   // Grab accelerometer data (acceleration is measured in m/s^2)
   sensors_vec_t accel = read_accelerometer(mma, accel_error);
   x=accel.x;  y=accel.y;  z=accel.z;
-  
+
   // Grab thermocouple data for Mk.2
   #if CONFIGURATION == MK_2
   char thermo_name[] = "chamber n";
@@ -192,7 +227,7 @@ void loop() {
 
   // Update sensor diagnostic message on LCD
   update_sensor_errors();
-  
+
   // Run autonomous control
   run_control();
 
@@ -220,13 +255,13 @@ void loop() {
 
   // Read a command
   bool valve_command;
-  
+
   BEGIN_READ
   READ_FLAG(zero_force) {
     Serial.println(F("Zeroing load cell"));
     scale.tare(); // Load Cell, Assuming there is no weight on the scale, reset to 0
   }
-  
+
   READ_FLAG(zero_pressure) {
     if (pressure_zero_ready) {
       Serial.println(F("Zeroing fuel pressure"));
@@ -240,7 +275,7 @@ void loop() {
       Serial.println(F("Pressure zero values not ready"));
     }
   }
-  
+
   READ_FLAG(heartbeat) {
     heartbeat();
   }
@@ -269,6 +304,12 @@ void loop() {
   }
   READ_FIELD(ox_main_command, "%d", valve_command) {
     set_valve(OX_MAIN, valve_command);
+  }
+  READ_FIELD(n2_choke_command, "%d", valve_command) {
+    set_valve(N2_CHOKE, valve_command);
+  }
+  READ_FIELD(n2_drain_command, "%d", valve_command) {
+    set_valve(N2_DRAIN, valve_command);
   }
   READ_DEFAULT(data_name, data) {
     Serial.print(F("Invalid data field recieved: "));
