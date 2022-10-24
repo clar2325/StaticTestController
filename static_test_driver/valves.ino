@@ -1,21 +1,27 @@
+class Valve
+{
+public:
+  uint8_t m_valvepin;
+  String m_valvename;
+  String m_telemetry_id;
 
-const uint8_t valve_pins[] = {34, 33, 32, 31};
+  Valve(uint8_t pin, String& name; String& telemetry) : m_valvepin{pin}, m_valvename{name}, m_telemetry_id{telemetry}{}
 
-const char *valve_names[] = {"Fuel prestage", "Fuel mainstage", "Oxygen prestage", "Oxygen mainstage"};
-const char *valve_telemetry_ids[] = {"fuel_pre_setting", "fuel_main_setting", "ox_pre_setting", "ox_main_setting"};
+  void init_valve;
+  void set_valve;
+};
 
-void init_engine() {
-  for (uint8_t i = 0; i < sizeof(valve_pins); i++) {
-    pinMode(valve_pins[i], OUTPUT);
-  }
-  pinMode(IGNITER_PIN, OUTPUT);
+// valve initializer function
+void Valve::init_valve(uint8_t pin) {
+  pinMode(pin, OUTPUT);
 }
 
-void set_valve(int valve, bool setting) {
-  Serial.print(valve_names[valve]);
+// valve setting function
+void Valve::set_valve(bool setting) {
+  Serial.print(m_valvename);
   Serial.print(F(" to "));
   Serial.println(setting? F("open") : F("closed"));
-  SEND_NAME(valve_telemetry_ids[valve], setting);
-  valve_status[valve] = setting;
-  digitalWrite(valve_pins[valve], setting);
+  SEND_NAME(m_telemetry_id, setting);
+  digitalWrite(m_valvepin, setting);
 }
+
