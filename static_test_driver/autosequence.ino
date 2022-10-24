@@ -40,8 +40,7 @@ typedef enum {
   MAINSTAGE,
   OXYGEN_SHUTDOWN,
   SHUTDOWN,
-  COOL_DOWN,
-  STATIC_TEST_COMPLETE
+  COOL_DOWN
 } state_t;
 
 // Convenience
@@ -106,12 +105,12 @@ void abort_autosequence() {
     case PRESTAGE_READY:
       set_valve(FUEL_PRE, 0);
       set_valve(OX_PRE, 0);
-      set_valve(N2_CHOKE. 0);   
+      set_valve(N2_CHOKE. 0);
       SET_STATE(STAND_BY)
       break;
 
     case PRESTAGE:
-      set_valve(N2_CHOKE, 0);   
+      set_valve(N2_CHOKE, 0);
       set_valve(OX_PRE, 0);
       set_valve(FUEL_PRE, 0);
       reset_igniter();
@@ -120,7 +119,7 @@ void abort_autosequence() {
       break;
 
     case MAINSTAGE:
-      set_valve(N2_CHOKE, 0); 
+      set_valve(N2_CHOKE, 0);
       set_valve(OX_PRE, 0);
       set_valve(FUEL_PRE, 0);
       SET_STATE(SHUTDOWN)
@@ -160,7 +159,7 @@ void run_control() {
       #endif
       if (run_time >= PRESTAGE_PREP_TIME) {
         SET_STATE(PRESTAGE_READY)
-        set_valve(N2_CHOKE, 1);               
+        set_valve(N2_CHOKE, 1);
         set_valve(FUEL_PRE, 1);
         set_valve(OX_PRE, 1);
       }
@@ -219,7 +218,7 @@ void run_control() {
     case SHUTDOWN:
       // Both prestage valves are closed, others may still be open
       if (millis() >= shutdown_time + PRE_LEADTIME) {
-        set_valve(N2_CHOKE, 0);   
+        set_valve(N2_CHOKE, 0);
         set_valve(OX_MAIN, 0);
         set_valve(FUEL_MAIN, 0);
         SET_STATE(COOL_DOWN)
@@ -235,36 +234,5 @@ void run_control() {
       }
       break;
 
-    case STATIC_TEST_COMPLETE:
-      // State that requires manual input to open Kero valve once static test is completed for the day
-      char state;
-      for (int i=1; i<10; i++){
-        cout << "Are you done test firing for the day? [Y/N]";
-        cin >> state;
-        if (state=='Y'){
-          cout << "Are you sure you're done? [Y/N]";
-          cin >> state;
-          if (state=='Y'){
-            cout << "Draining Kerosene valve...vwooosh";
-            set_valve(KERO_DRAIN, 1);
-            return;
-          }
-          else if (state=='N'){
-            cout << "Let the firing resume!";
-            return;
-          }
-          else{
-            break;
-          }
-        }
-        else if (state=='N'){
-          cout << "Let the firing resume!";
-          return;
-        }
-        else{
-          break;
-        }
-      }
-      break;
   }
 }
