@@ -1,4 +1,3 @@
-
 #define SENSOR_ERROR_LIMIT 5 // Max number of errors in a row before deciding a sensor is faulty
 
 #define PRESSURE_CALIBRATION_FACTOR 246.58
@@ -25,7 +24,7 @@
 
 String sensor_errors = "";
 
-//Number of Sensors 
+//Number of Sensors
 //Load Cells - 4
 //Pressure Transducers - 4
 //Thermocouples - n/a (not a priority)
@@ -51,12 +50,12 @@ void error_check(int &error, bool working, const String &sensor_type, const Stri
   if (working) {
     error = 0;
   } else {
-    if (sensor_errors.length()) { 
+    if (sensor_errors.length()) {
       sensor_errors += ',';
     }
     sensor_errors += sensor_type.substring(0, min(sensor_type.length(), 2)) + sensor_short_name;
-    if (!error) { 
-      Serial.print(sensor_name);    
+    if (!error) {
+      Serial.print(sensor_name);
       if (sensor_name.length()) {
         Serial.print(' ');
       }
@@ -64,20 +63,20 @@ void error_check(int &error, bool working, const String &sensor_type, const Stri
       Serial.println(F(" sensor error"));
     }
     error++;
-    if (error > SENSOR_ERROR_LIMIT) {     
+    if (error > SENSOR_ERROR_LIMIT) {
       sensor_status = false; //static_test_driver
     }
 
-   
+
   }
 }
 
 
 //-------------------------------------------------------------------------------------------
-//LoadCell 
+//LoadCell
 //-------------------------------------------------------------------------------------------
 
-//SENSOR DEVICE 1 
+//SENSOR DEVICE 1
 
 class LoadCell
 {
@@ -91,16 +90,19 @@ class LoadCell
 
   int m_error;
 
-  LoadCell(){}
   LoadCell(uint8_t dout, uint8_t clk) : m_calibrationFactor{LOAD_CELL_CALIBRATION_FACTOR} , m_dout {dout} , m_clk {clk}, m_error{0} {}
 
   float read_force();
   void init_force();
 };
 
-void LoadCell::init_force() {
+
+void LoadCell::init_force(uint8_t dout, uint8_t clk) {
+  m_dout = dout;
+  m_clk = clk;
+
   m_scale.begin(m_dout, m_clk);
-  
+
   // Calibrate load cell
   m_scale.set_scale(m_calibrationFactor); // This value is obtained by using the SparkFun_HX711_Calibration sketch
   //Calibration is just the slope of the data function we get from the cell, we use it to find force at the values we get.
@@ -108,7 +110,7 @@ void LoadCell::init_force() {
 
   // Try reading a value from the load cell
   read_force();
-  
+
   if (!m_error) {
     Serial.println(F("Load cell amp connected"));
   }
@@ -137,13 +139,13 @@ float LoadCell::read_force() {
 
 
 //-------------------------------------------------------------------------------------------
-//Thermocouple 
+//Thermocouple
 //-------------------------------------------------------------------------------------------
 
 //SENSOR DEVICE 2
 
 
-class Thermocouple 
+class Thermocouple
 {
   private:
   Adafruit_MAX31855 m_thermocouple;
@@ -153,8 +155,8 @@ class Thermocouple
   const String m_sensor_name;
   const String m_sensor_short_name;
 
-  Thermocouple(int8_t pin, const String& name, const String& shortname) : m_thermocouplepin {pin}, m_sensor_name { name } , m_sensor_short_name { shortname }, m_error{0} , m_thermocouple{pin} {} 
-  
+  Thermocouple(int8_t pin, const String& name, const String& shortname) : m_thermocouplepin {pin}, m_sensor_name { name } , m_sensor_short_name { shortname }, m_error{0} , m_thermocouple{pin} {}
+
   void init_thermocouple();
   float read_thermocouple();
   float read_temp();
@@ -190,7 +192,7 @@ float Thermocouple::read_thermocouple() {
 //Pressure Transducers
 //-------------------------------------------------------------------------------------------
 
-//Sensor Device 3 
+//Sensor Device 3
 
 class PressureTransducer
 {
@@ -199,10 +201,10 @@ class PressureTransducer
   int m_error;
   const String m_sensor_name;
   const String m_sensor_short_name;
-  PressureTransducer(int pin, const String& name, const String& shortname) : m_pressurepin{pin}, m_sensor_name{name}, m_sensor_short_name{shortname} , m_error{0} {} 
+  PressureTransducer(int pin, const String& name, const String& shortname) : m_pressurepin{pin}, m_sensor_name{name}, m_sensor_short_name{shortname} , m_error{0} {}
 
   float read_pressure(int sensor);
-  
+
 };
 
 float PressureTransducer::read_pressure(int sensor) {
@@ -219,8 +221,8 @@ void init_accelerometer(Adafruit_MMA8451 &mma) {
   bool working = false;
   if (mma.begin()) {
     mma.setRange(MMA8451_RANGE_2_G);  // set acc range (2 4 8)
-    Serial.print(F("Accelerometer range ")); 
-    Serial.print(2 << mma.getRange()); 
+    Serial.print(F("Accelerometer range "));
+    Serial.print(2 << mma.getRange());
     Serial.println("G");
     working = true;
   }
