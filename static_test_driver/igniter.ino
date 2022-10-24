@@ -1,6 +1,3 @@
-
-#define IGNITER_PIN 15
-
 #if CONFIGURATION == DEMO
 #define IGNITER_DURATION 5000
 #else
@@ -10,6 +7,10 @@
 
 long ignition_time = 0;
 bool ignitor_active = false;
+
+void init_igniter(int pin){
+  pinMode(pin, OUTPUT);
+}
 
 void fire_igniter() {
   Serial.println("Firing igniter");
@@ -29,3 +30,4 @@ void handle_igniter() {
     reset_igniter();
   }
 }
+
