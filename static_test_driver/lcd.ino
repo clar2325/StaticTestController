@@ -1,7 +1,4 @@
-
-#define WIDTH 16
-#define SCROLL_PERIOD 700 // milliseconds
-
+#include "defs.h"
 void set_lcd_status(String state) {
   state.replace("_", " ");
   state.toLowerCase();

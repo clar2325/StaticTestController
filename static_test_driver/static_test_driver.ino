@@ -1,12 +1,3 @@
-#define DEMO 0
-#define MK_2 2
-
-// Change this line to set configuration
-#define CONFIGURATION MK_2
-
-#if !(CONFIGURATION == DEMO || CONFIGURATION == MK_2)
-#error "Invalid configuration value"
-#endif
 
 #include <SPI.h>
 #include <Wire.h>
@@ -17,69 +8,42 @@
 #include <Adafruit_LiquidCrystal.h>
 #include <Telemetry.h>
 #include <avr/pgmspace.h>
+#include "defs.h"
 
-// Accelerometer
-Adafruit_MMA8451 mma;
-int accel_error = 0;
+//declare pressure transducers
+PressureTransducer pressure_fuel{PRESSURE_FUEL, "fuel", "Fl"};
+PressureTransducer pressure_ox{PRESSURE_OX, "oxygen", "ox"};
+PressureTransducer pressure_fuel_injector{PRESSURE_FUEL_INJECTOR, "injector fuel", "FlE"};
+PressureTransducer pressure_ox_injector{PRESSURE_OX_INJECTOR, "injector oxygen", "OxE"};
 
-// Analog Temperature Setup
-#define INLET_TEMP A5
-#define OUTLET_TEMP A4
-#define NUMBER_OF_TEMP_SENSORS 4
-int temp_error[NUMBER_OF_TEMP_SENSORS] = {0,0};
+bool global_pressure_zero_ready = false;
+//declare load cells
 
-// Pressure Setup
-#define PRESSURE_FUEL A0
-#define PRESSURE_OX A1
-#define PRESSURE_FUEL_INJECTOR A2
-#define PRESSURE_OX_INJECTOR A3
-#define PRESSURE_NUM_HIST_VALS 10
-#define NUMBER_OF_PRESSURE_SENSORS 4
+LoadCell loadcell_1{LOAD_CELL_1_DOUT, LOAD_CELL_1_CLK};
+LoadCell loadcell_2{LOAD_CELL_2_DOUT, LOAD_CELL_2_CLK};
+LoadCell loadcell_3{LOAD_CELL_3_DOUT, LOAD_CELL_3_CLK};
+LoadCell loadcell_4{LOAD_CELL_4_DOUT, LOAD_CELL_4_CLK};
 
-// Pressure sensor 0 = Fuel, Pressure sensor 1 = Oxidizer
-float pressure_hist_vals[NUMBER_OF_PRESSURE_SENSORS][PRESSURE_NUM_HIST_VALS];
-int pressure_val_num = 0;
-bool pressure_zero_ready = false;
-float pressure_zero_val[NUMBER_OF_PRESSURE_SENSORS] = {0,0,0,0};
-int pressure_error[NUMBER_OF_PRESSURE_SENSORS] = {0,0,0,0};
-
-// Load cell setup
-#define LOAD_CELL_DOUT 2
-#define LOAD_CELL_CLK  26
-HX711 scale;
-int force_error = 0;
-
-// Thermocouple setup for MK_2
-#if CONFIGURATION == MK_2
-#define NUMBER_OF_THERMOCOUPLES 3
-// Using hardware SPI port: MISO=50, MOSI=51, SCK=52
-Adafruit_MAX31855 chamber_thermocouples[NUMBER_OF_THERMOCOUPLES] = {
-  Adafruit_MAX31855(45), Adafruit_MAX31855(46), Adafruit_MAX31855(47) // Pins 45-49 reserved for CS
-};
-int thermocouple_error[NUMBER_OF_THERMOCOUPLES] = {0,0,0};
-#endif
 
 // LCD
 // Connect via i2c, default address #0 (A0-A2 not jumpered)
 Adafruit_LiquidCrystal lcd(0);
 
-// Sensor data
-#if CONFIGURATION == MK_2
-float chamber_temp[NUMBER_OF_THERMOCOUPLES];
-#endif
-float pressure_fuel, pressure_ox, pressure_fuel_injector, pressure_ox_injector, force, x,y,z, inlet_temp, outlet_temp;
+
+//declare thermocouples 
+Thermocouple thermocouple_1{THERMOCOUPLE_PIN_1, "temperature", "temp"};
+Thermocouple thermocouple_2{THERMOCOUPLE_PIN_2, "temperature", "temp"};
+
 
 bool sensor_status = true;
 
-// Engine controls
-typedef enum {
-  FUEL_PRE,
-  FUEL_MAIN,
-  OX_PRE,
-  OX_MAIN
-} valve_t;
-
-bool valve_status[] = {false, false, false, false};
+//declare all valves
+Valve valve_fuel_pre{FUEL_PRE_PIN, "fuel pre", "FlPre"};
+Valve valve_fuel_main{FUEL_MAIN_PIN, "fuel main", "FlMain"};
+Valve valve_ox_pre{OX_PRE_PIN, "oxygen pre", "OxPre"};
+Valve valve_ox_main{OX_MAIN_PIN, "oxygen main", "OxMain"};
+Valve valve_n2_choke{N2_CHOKE_PIN, "n2 choke", "N2Pre"};
+Valve valve_n2_drain{N2_DRAIN_PIN, "n2 drain", "N2Main"};
 
 unsigned long last_heartbeat = 0;
 
@@ -91,190 +55,152 @@ char data_name[20] = "";
 void (*reset)(void) = 0;
 
 void setup() {
-  // Initialize LCD, set up the number of rows and columns
-  lcd.begin(16, 2);
-  set_lcd_status("Initializing...");
+    // Initialize LCD, set up the number of rows and columns
+    lcd.begin(16, 2);
+    set_lcd_status("Initializing...");
 
-  // Initialize serial
-  while (!Serial);
-  Serial.begin(115200);
-#if CONFIGURATION == DEMO
-  Serial.println(F("Demo static test driver"));
-#elif CONFIGURATION == MK_2
-  Serial.println(F("Mk 2 static test driver"));
-#endif
-  Serial.println(F("Initializing..."));
-  
-  // wait for chips to stabilize
-  delay(500);
-  
-  // Initialize Pressure Sensors
-  pinMode(PRESSURE_FUEL, INPUT);
-  pinMode(PRESSURE_OX, INPUT);
-  pinMode(PRESSURE_FUEL_INJECTOR, INPUT);
-  pinMode(PRESSURE_OX_INJECTOR, INPUT);
-  
-  // Initialize Analog Temp Sensors
-  pinMode(INLET_TEMP, INPUT);
-  pinMode(OUTLET_TEMP, INPUT);
-  
-  // Initialize load cell
-  init_force(scale);
-  
-  // Initialize accelerometer
-  Wire.begin();
-  init_accelerometer(mma);
-  
-  // Initialize thermocouples for Mk.2
-  #if CONFIGURATION == MK_2
-  char thermo_name[] = "chamber n";
-  char thermo_short_name[] = "n";
-  for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
-    thermo_name[8] = thermo_short_name[0] = '1' + i;
-    init_thermocouple(chamber_thermocouples[i], thermo_name, thermo_short_name);
-  }
-  #endif
+    // Initialize serial
+    while (!Serial);
+    Serial.begin(115200);
+    Serial.println(F("Mk 2 static test driver"));
+    Serial.println(F("Initializing..."));
+    delay(500); // wait for chips to stabilize
 
-  // Initialize engine controls
-  init_engine();
+    //init forces and pressure
+    pressure_fuel.init_transducer();
+    pressure_ox.init_transducer();
+    pressure_fuel_injector.init_transducer();
+    pressure_ox_injector.init_transducer();
 
-  // Set initial state
-  init_autosequence();
-  
-  Serial.println("Setup Complete");
+    loadcell_1.init_loadcell();
+    loadcell_2.init_loadcell();
+    loadcell_3.init_loadcell();
+    loadcell_4.init_loadcell();
+   
+    //thermocouples
+
+    thermocouple_1.init_thermocouple();
+    thermocouple_2.init_thermocouple();
+   
+    //init all valves
+    valve_fuel_pre.init_valve();
+    valve_fuel_main.init_valve();
+    valve_ox_pre.init_valve();
+    valve_ox_main.init_valve();
+    valve_n2_choke.init_valve();
+    valve_n2_drain.init_valve();
+
+    // Set initial state
+    init_autosequence();
+
+    Serial.println("Setup Complete");
 }
 
 void loop() {
-  // Grab force data
-  force = read_force(scale, force_error); // Force is measured in lbs
-  
-  // Grab pressure data
-  pressure_fuel = read_pressure(PRESSURE_FUEL, pressure_error[0], "fuel", "Fl");
-  pressure_ox = read_pressure(PRESSURE_OX, pressure_error[1], "oxygen", "Ox");
-  pressure_fuel_injector = read_pressure(PRESSURE_FUEL_INJECTOR, pressure_error[2], "injector fuel", "FlE");
-  pressure_ox_injector = read_pressure(PRESSURE_OX_INJECTOR, pressure_error[3], "injector oxygen", "OxE");
-  
-  // Update pressure tare data
-  pressure_hist_vals[0][pressure_val_num] = pressure_fuel;
-  pressure_hist_vals[1][pressure_val_num] = pressure_ox;
-  pressure_hist_vals[2][pressure_val_num] = pressure_fuel_injector;
-  pressure_hist_vals[3][pressure_val_num] = pressure_ox_injector;
-  
-  // Tare pressures
-  pressure_fuel -= pressure_zero_val[0];
-  pressure_ox -= pressure_zero_val[1];
-  pressure_fuel_injector -= pressure_zero_val[2];
-  pressure_ox_injector -= pressure_zero_val[3];
-  
-  pressure_val_num++;
-  if (pressure_val_num >= PRESSURE_NUM_HIST_VALS) {
-    pressure_val_num = 0;
-    pressure_zero_ready = true;
-  }
-  
-  // Grab analog temperature data
-  inlet_temp = read_temp(INLET_TEMP, temp_error[0], "inlet", "In");
-  outlet_temp = read_temp(OUTLET_TEMP, temp_error[1], "outlet", "Out");
-  
-  // Grab accelerometer data (acceleration is measured in m/s^2)
-  sensors_vec_t accel = read_accelerometer(mma, accel_error);
-  x=accel.x;  y=accel.y;  z=accel.z;
-  
-  // Grab thermocouple data for Mk.2
-  #if CONFIGURATION == MK_2
-  char thermo_name[] = "chamber n";
-  char thermo_short_name[] = "n";
-  for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
-    thermo_name[8] = thermo_short_name[0] = '1' + i;
-    chamber_temp[i] = read_thermocouple(chamber_thermocouples[i], thermocouple_error[i], thermo_name, thermo_short_name);
-  }
-  #endif
+    // Grab force data
+    loadcell_1.updateForces();
+    loadcell_2.updateForces();
+    loadcell_3.updateForces();
+    loadcell_4.updateForces();
+    
+    // Update pressures
+    pressure_fuel.updatePressures();
+    pressure_ox.updatePressures();
+    pressure_fuel_injector.updatePressures();
+    pressure_ox_injector.updatePressures();
+    
+    // Grab thermocouple data 
+    thermocouple_1.updateTemps();
+    thermocouple_2.updateTemps();
+   
+    // Update sensor diagnostic message on LCD
+    update_sensor_errors();
 
-  // Update sensor diagnostic message on LCD
-  update_sensor_errors();
-  
-  // Run autonomous control
-  run_control();
+    // Run autonomous control
+    run_control();
 
-  // Send collected data
-  BEGIN_SEND
-    SEND_ITEM(force, force)
-    SEND_ITEM(accel, x)
-    SEND_GROUP_ITEM(y)
-    SEND_GROUP_ITEM(z)
-    SEND_ITEM(outlet_temp, outlet_temp)
-    SEND_ITEM(inlet_temp, inlet_temp)
-    SEND_ITEM(fuel_press, pressure_fuel)
-    SEND_ITEM(ox_press, pressure_ox)
-    SEND_ITEM(fuel_inj_press, pressure_fuel_injector)
-    SEND_ITEM(ox_inj_press, pressure_ox_injector)
-    #if CONFIGURATION == MK_2
-    char chamber_temp_item_name[] = "chamber_temp_n";
-    for (unsigned i = 0; i < NUMBER_OF_THERMOCOUPLES; i++) {
-      chamber_temp_item_name[13] = '1' + i;
-      SEND_ITEM_NAME(chamber_temp_item_name, chamber_temp[i])
-    }
-    #endif
+    // Send collected data
+  
+    BEGIN_SEND
+        SEND_ITEM(force, loadcell_1.m_current_force)
+        SEND_ITEM(force, loadcell_2.m_current_force)
+        SEND_ITEM(force, loadcell_3.m_current_force)
+        SEND_ITEM(force, loadcell_4.m_current_force)
+        //Don't think I can send force data to separate locations right now
+        
+        //SEND_ITEM(outlet_temp, outlet_temp)
+        //SEND_ITEM(inlet_temp, inlet_temp)
+        
+        SEND_ITEM(fuel_press, pressure_fuel.m_current_pressure)
+        SEND_ITEM(ox_press, pressure_ox.m_current_pressure)
+        SEND_ITEM(fuel_inj_press, pressure_fuel_injector.m_current_pressure)
+        SEND_ITEM(ox_inj_press, pressure_ox_injector.m_current_pressure)
+        //send thermocouple data
+        //What keywords to use?
+        
     SEND_ITEM(sensor_status, sensor_status)
-  END_SEND
+        END_SEND
 
-  // Read a command
-  bool valve_command;
-  
-  BEGIN_READ
-  READ_FLAG(zero_force) {
-    Serial.println(F("Zeroing load cell"));
-    scale.tare(); // Load Cell, Assuming there is no weight on the scale, reset to 0
-  }
-  
-  READ_FLAG(zero_pressure) {
-    if (pressure_zero_ready) {
-      Serial.println(F("Zeroing fuel pressure"));
-      pressure_zero_val[0] = mean(pressure_hist_vals[0], PRESSURE_NUM_HIST_VALS);
-      Serial.println(F("Zeroing oxidizer pressure"));
-      pressure_zero_val[1] = mean(pressure_hist_vals[1], PRESSURE_NUM_HIST_VALS);
-      pressure_zero_ready = false;
-      pressure_val_num = 0;
+        // Read a command
+        bool valve_command;
+
+    BEGIN_READ
+        READ_FLAG(zero_force) {
+        Serial.println(F("Zeroing load cells"));
+        loadcell_1.zeroForces(); 
+        loadcell_2.zeroForces(); 
+        loadcell_3.zeroForces(); 
+        loadcell_4.zeroForces(); 
     }
-    else {
-      Serial.println(F("Pressure zero values not ready"));
+
+    READ_FLAG(zero_pressure) {
+        if (pressure_fuel.m_zero_ready || pressure_ox.m_zero_ready) {
+            Serial.println(F("Zeroing fuel pressure"));
+            pressure_fuel.zeroPressures();
+            pressure_fuel.m_zero_ready = false;
+            Serial.println(F("Zeroing oxidizer pressure"));
+            pressure_ox.zeroPressures();
+            pressure_ox.m_zero_ready = false;
+        }
+        else {
+            Serial.println(F("Pressure zero values not ready"));
+        }
     }
-  }
-  
-  READ_FLAG(heartbeat) {
-    heartbeat();
-  }
-  READ_FLAG(reset) {
-    Serial.println(F("Resetting board"));
-    reset();
-  }
-  READ_FLAG(start) {
-    start_countdown();
-  }
-  READ_FLAG(stop) {
-    Serial.println(F("Manual abort initiated"));
-    abort_autosequence();
-  }
-  READ_FLAG(fire_igniter) {
-    fire_igniter();
-  }
-  READ_FIELD(fuel_pre_command, "%d", valve_command) {
-    set_valve(FUEL_PRE, valve_command);
-  }
-  READ_FIELD(fuel_main_command, "%d", valve_command) {
-    set_valve(FUEL_MAIN, valve_command);
-  }
-  READ_FIELD(ox_pre_command, "%d", valve_command) {
-    set_valve(OX_PRE, valve_command);
-  }
-  READ_FIELD(ox_main_command, "%d", valve_command) {
-    set_valve(OX_MAIN, valve_command);
-  }
-  READ_DEFAULT(data_name, data) {
-    Serial.print(F("Invalid data field recieved: "));
-    Serial.print(data_name);
-    Serial.print(":");
-    Serial.println(data);
-  }
-  END_READ
+
+    READ_FLAG(heartbeat) {
+        heartbeat();
+    }
+    READ_FLAG(reset) {
+        Serial.println(F("Resetting board"));
+        reset();
+    }
+    READ_FLAG(start) {
+        start_countdown();
+    }
+    READ_FLAG(stop) {
+        Serial.println(F("Manual abort initiated"));
+        abort_autosequence();
+    }
+    READ_FLAG(fire_igniter) {
+        fire_igniter();
+    }
+    READ_FIELD(fuel_pre_command, "%d", valve_command) {
+       valve_fuel_pre.set_valve(valve_command);
+    }
+    READ_FIELD(fuel_main_command, "%d", valve_command) {
+        valve_fuel_pre.set_valve(valve_command);
+    }
+    READ_FIELD(ox_pre_command, "%d", valve_command) {
+        valve_fuel_pre.set_valve(valve_command);
+    }
+    READ_FIELD(ox_main_command, "%d", valve_command) {
+        valve_fuel_pre.set_valve(valve_command);
+    }
+    READ_DEFAULT(data_name, data) {
+        Serial.print(F("Invalid data field recieved: "));
+        Serial.print(data_name);
+        Serial.print(":");
+        Serial.println(data);
+    }
+    END_READ
 }

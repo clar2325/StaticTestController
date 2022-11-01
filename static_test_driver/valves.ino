@@ -1,16 +1,22 @@
-class Valve
-{
-public:
-  uint8_t m_valvepin;
-  String m_valvename;
-  String m_telemetry_id;
-  bool m_current_state;
 
-  Valve(uint8_t pin, String& name; String& telemetry) : m_valvepin{pin}, m_valvename{name}, m_telemetry_id{telemetry}, m_current_state{false} {}
+/*
+const uint8_t valve_pins[] = {34, 33, 32, 31};
 
-  void init_valve();
-  void set_valve();
-};
+const char *valve_names[] = {"Fuel prestage", "Fuel mainstage", "Oxygen prestage", "Oxygen mainstage"};
+const char *valve_telemetry_ids[] = {"fuel_pre_setting", "fuel_main_setting", "ox_pre_setting", "ox_main_setting"};
+
+
+This function will have to be remade in the static_test_driver file. After we create a Valve array etc etc.
+void init_engine() {
+  for (uint8_t i = 0; i < sizeof(valve_pins); i++) {
+    pinMode(valve_pins[i], OUTPUT);
+  }
+  pinMode(IGNITER_PIN, OUTPUT);
+}
+*/
+#include "defs.h"
+
+
 
 // valve initializer function
 void Valve::init_valve() {
@@ -28,4 +34,3 @@ void Valve::set_valve(bool setting) {
   SEND_NAME(m_telemetry_id, m_current_state);
   digitalWrite(m_valvepin, m_current_state);
 }
-

@@ -1,27 +1,4 @@
-
-#define SENSOR_ERROR_LIMIT 5 // Max number of errors in a row before deciding a sensor is faulty
-
-#define PRESSURE_CALIBRATION_FACTOR 246.58
-#define PRESSURE_OFFSET 118.33
-#define PRESSURE_MIN_VALID -100
-#define PRESSURE_MAX_VALID 1000
-
-#define TEMP_MIN_VALID -10
-#define TEMP_MAX_VALID 120
-
-#define FORCE_MIN_VALID -50
-#define FORCE_MAX_VALID 500
-
-#if CONFIGURATION == MK_2
-#define LOAD_CELL_CALIBRATION_FACTOR 20400.0 //This value is obtained using the SparkFun_HX711_Calibration sketch
-#else
-#define LOAD_CELL_CALIBRATION_FACTOR 20400
-#endif
-
-#define LOAD_CELL_RETRY_INTERVAL 10
-#define LOAD_CELL_MAX_RETRIES 20
-
-
+#include "defs.h"
 
 String sensor_errors = "";
 
@@ -35,12 +12,6 @@ String sensor_errors = "";
 //Utility Functions
 //-------------------------------------------------------------------------------------------
 
-float mean(const float *data, unsigned int size) {
-  float result = 0;
-  for (int i = 0; i < size; i++)
-      result += data[i];
-  return result / size;
-}
 
 void update_sensor_errors() {
   set_lcd_errors(sensor_errors);
@@ -72,33 +43,13 @@ void error_check(int &error, bool working, const String &sensor_type, const Stri
   }
 }
 
-
 //-------------------------------------------------------------------------------------------
 //LoadCell 
 //-------------------------------------------------------------------------------------------
 
 //SENSOR DEVICE 1 
 
-class LoadCell
-{
-  private:
-  HX711 m_scale;
-
-  public:
-  uint8_t m_dout; //Digital out pin
-  uint8_t m_clk;  //Clock pin
-  double m_calibrationFactor;
-
-  int m_error;
-
-  LoadCell(){}
-  LoadCell(uint8_t dout, uint8_t clk) : m_calibrationFactor{LOAD_CELL_CALIBRATION_FACTOR} , m_dout {dout} , m_clk {clk}, m_error{0} {}
-
-  float read_force();
-  void init_force();
-};
-
-void LoadCell::init_force() {
+void LoadCell::init_loadcell() {
   m_scale.begin(m_dout, m_clk);
   
   // Calibrate load cell
@@ -114,6 +65,7 @@ void LoadCell::init_force() {
   }
   delay(100);
 }
+
 
 float LoadCell::read_force() {
   // Wait for load cell data to become ready
@@ -143,24 +95,6 @@ float LoadCell::read_force() {
 //SENSOR DEVICE 2
 
 
-class Thermocouple 
-{
-  private:
-  Adafruit_MAX31855 m_thermocouple;
-  public:
-  int m_thermocouplepin;
-  int m_error;
-  const String m_sensor_name;
-  const String m_sensor_short_name;
-
-  Thermocouple(int8_t pin, const String& name, const String& shortname) : m_thermocouplepin {pin}, m_sensor_name { name } , m_sensor_short_name { shortname }, m_error{0} , m_thermocouple{pin} {} 
-  
-  void init_thermocouple();
-  float read_thermocouple();
-  float read_temp();
-
-};
-
 float Thermocouple::read_temp() {
   float result = analogRead(m_thermocouplepin) * 5.0 * 100 / 1024;
   error_check(m_error, result > TEMP_MIN_VALID && result < TEMP_MAX_VALID, "temp", m_sensor_name, m_sensor_short_name);
@@ -168,6 +102,9 @@ float Thermocouple::read_temp() {
 }
 
 void Thermocouple::init_thermocouple() {
+
+  pinMode(m_thermocouplepin, INPUT);
+  
   int error = 0;
   m_thermocouple.begin();
   read_thermocouple();
@@ -192,24 +129,33 @@ float Thermocouple::read_thermocouple() {
 
 //Sensor Device 3 
 
-class PressureTransducer
+
+void PressureTransducer::init_transducer()
 {
-  public:
-  int m_pressurepin;
-  int m_error;
-  const String m_sensor_name;
-  const String m_sensor_short_name;
-  PressureTransducer(int pin, const String& name, const String& shortname) : m_pressurepin{pin}, m_sensor_name{name}, m_sensor_short_name{shortname} , m_error{0} {} 
+  pinMode(m_pressurepin, INPUT);
+}
 
-  float read_pressure(int sensor);
-  
-};
-
-float PressureTransducer::read_pressure(int sensor) {
-  float result = (analogRead(sensor) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET;
+float PressureTransducer::read_pressure() {
+  float result = (analogRead(m_pressurepin) * 5 / 1024.0) * PRESSURE_CALIBRATION_FACTOR - PRESSURE_OFFSET;
   error_check(m_error, result > PRESSURE_MIN_VALID && result < PRESSURE_MAX_VALID, m_sensor_name, "pressure");
   return result;
-};
+}
+
+void PressureTransducer::updatePressures()
+{
+   m_current_pressure = read_pressure();
+
+    if(m_current_hist_val >= PRESSURE_NUM_HIST_VALS)
+    {
+      m_current_hist_val = 0;
+      m_zero_ready = true;
+    }
+    
+    m_pressure_history[m_current_hist_val] = m_current_pressure;
+    m_current_pressure -= m_tare;
+      m_current_hist_val++;
+}
+
 
 //-------------------------------------------------------------------------------------------
 //Accelerometer
