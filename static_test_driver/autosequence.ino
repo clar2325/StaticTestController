@@ -1,38 +1,56 @@
-// Timing
-#define PRESTAGE_PREP_TIME 0 // Time at which to open the prestage valves
+#define DEMO       1    // demo run
+#define MK_2_FULL  2    // Test fire for Mk.2 full capacity (new ox regulator)
+#define MK_2_LOW   3    // Test fire for Mk.2 low capacity  (old ox regulator)
+
+#define CONFIGURATION MK_2_LOW
+
+#define PRESTAGE_PREP_TIME 0              // Time at which to open the prestage valves
 #define PRESTAGE_TIME      0
 #define MAINSTAGE_TIME     0
-#define THRUST_CHECK_TIME  2000 // Time at which to start checking the engine is producing thrust, etc.
-#define OX_LEADTIME        500  // Delay between closing oxygen and closing fuel prestage
-#define PRE_LEADTIME       1000 // Delay between closing oxygen prestage and closing both mainstage
-#define HEARTBEAT_TIMEOUT  1000 // Timeout to abort the run after not recieving a heartbeat signal
+#define THRUST_CHECK_TIME  2000           // Time at which to start measuring engine output thrust (2 seconds)
+#define OX_LEADTIME        500            // Delay between closing oxygen prestage valve and closing fuel prestage valve (0.5 seconds)
+#define PRE_LEADTIME       1000           // Delay between closing oxygen prestage valve and closing both mainstage valves (1 second)
+#define HEARTBEAT_TIMEOUT  1000           // Timeout to abort run after not recieving heartbeat signal (1 second)
 
 #if CONFIGURATION == DEMO
-#define COUNTDOWN_DURATION 10000 // 10 sec
-#define RUN_TIME           10000 // 10 sec
-#define COOLDOWN_TIME      10000 // 10 sec
-#else
-#define COUNTDOWN_DURATION 60000 // 1 min
-#define RUN_TIME           12000 // 12 sec
-#define COOLDOWN_TIME      60000 * 5 // 5 mins
+  #define COUNTDOWN_DURATION  10000       // 10 seconds
+  #define RUN_TIME            10000       // 10 seconds
+  #define COOLDOWN_TIME       10000       // 10 seconds
+#elseif CONFIGURATION == MK_2_FULL
+  #define COUNTDOWN_DURATION  60000       // 1 minute
+  #define RUN_TIME            12000       // 12 seconds
+  #define COOLDOWN_TIME       60000 * 10  // 10 minutes
+#elseif CONFIGURATION == MK_2_LOW
+  #define COUNTDOWN_DURATION  60000       // 1 minute
+  #define RUN_TIME            8000        // 8 seconds
+  #define COOLDOWN_TIME       60000 * 5   // 5 minutes
 #endif
 
-// Limits
-// Max outlet temperature before triggering a shutdown
-#define MAX_COOLANT_TEMP 60
+//***Limits***//
+#define MAX_COOLANT_TEMP 60               // states max outlet temperature (60°C)
 
-// Min thrust that must be reached to avoid triggering a no-ignition shutdown
 #if CONFIGURATION == DEMO
-#define MIN_THRUST 50
-#elif CONFIGURATION == MK_2
-#define MIN_THRUST 1000
+  #define MIN_THRUST  50
+#elseif CONFIGURATION == MK_2_FULL
+  #define MIN_THRUST  1000                // Min thrust that must be reached to avoid triggering a no-ignition shutdown (1000 Newtons)
+#elseif CONFIGURATION == MK_2_LOW
+  #define MIN_THRUST  100                 // Min thrust that must be reached to avoid triggering a no-ignition shutdown (100 Newtons)
 #endif
 
-// State LED
-#define TERMINAL_COUNT_LED_PERIOD 250
-#define COOL_DOWN_LED_PERIOD 1000
+//***LED's***//
+#if CONFIGURATION == DEMO
+  #define TERMINAL_COUNT_LED_PERIOD 10000       // 1 minute
+  #define COOL_DOWN_LED_PERIOD      10000       // 1 minute
+#elseif CONFIGURATION == MK_2_FULL
+  #define TERMINAL_COUNT_LED_PERIOD 60000       // 1 minute
+  #define COOL_DOWN_LED_PERIOD      60000 * 10  // 10 minutes
+#elseif CONFIGURATION == MK_2_LOW
+  #define TERMINAL_COUNT_LED_PERIOD 60000       // 1 minute
+  #define COOL_DOWN_LED_PERIOD      60000 * 5   // 5 minutes
+#endif
 
-typedef enum {
+
+typedef enum{
   STAND_BY,
   TERMINAL_COUNT,
   PRESTAGE_READY,
@@ -40,230 +58,194 @@ typedef enum {
   MAINSTAGE,
   OXYGEN_SHUTDOWN,
   SHUTDOWN,
-  COOL_DOWN,
-  STATIC_TEST_COMPLETE
-} state_t;
+  COOL_DOWN
+}state_t;
 
-// Convenience
-#define SET_STATE(STATE) {    \
-    state = STATE;            \
-    write_state(#STATE);      \
-  }
+#define SET_STATE(STATE){
+  state = STATE;
+  write_state(#STATE);
+}
 
-
-long start_time = 0;
-long shutdown_time = 0;
+long start_time     = 0;
+long shutdown_time  = 0;
 long heartbeat_time = 0;
+
 state_t state = STAND_BY;
 
-void write_state(const char *state_name) {
+void write_state(const char *state_name){
   set_lcd_status(state_name);
   SEND(status, state_name);
 }
 
-void blink(int led, long period) {
+void blink(int led, long period){
   digitalWrite(led, (int)((millis() % (period * 2)) / period));
 }
 
-void heartbeat() {
+void heartbeat(){
   heartbeat_time = millis();
 }
 
-void init_autosequence() {
+void init_autosequence(){
   SET_STATE(STAND_BY);
 }
 
-void start_countdown() {
+void start_countdown(){
   #if CONFIGURATION != DEMO
-  if (!sensor_status) {
-    Serial.println(F("Countdown aborted due to sensor failure"));
-    SET_STATE(STAND_BY) // Set state to signal countdown was aborted
-  } else
+    if (sensor_status == false){
+      Serial.println(F("Countdown aborted due to sensor failure"));
+      SET_STATE(STAND_BY);
+    }else
   #endif
-  if (valve_status[FUEL_PRE] ||
-      valve_status[FUEL_MAIN] ||
-      valve_status[OX_PRE] ||
-      valve_status[OX_MAIN]) {
-    Serial.println(F("Countdown aborted due to unexpected initial state"));
-    SET_STATE(STAND_BY) // Set state to signal countdown was aborted
+  if (valve_fuel_pre.m_current_state  ||
+      valve_fuel_main.m_current_state ||
+      valve_ox_pre.m_current_state    ||
+      valve_ox_main.m_current_state   ||
+      valve_n2_choke.m_current_state  ||
+      valve_n2_drain.m_current_state  ){
+        Serial.println(F("Countdown aborted due to unexpected initial valve state."));
+        SET_STATE(STAND_BY);
   }
-  else {
-    Serial.println(F("Countdown started"));
-    SET_STATE(TERMINAL_COUNT)
+  else{
+    Serial.println(F("Countdown has started"));
+    SET_STATE(TERMINAL_COUNT);
     start_time = millis();
     heartbeat();
   }
 }
 
-void abort_autosequence() {
-  Serial.println(F("Run aborted"));
-  switch (state) {
+void abort_autosequence(){
+  Serial.println(F("run aborted"));
+  switch (state){
     case STAND_BY:
     case TERMINAL_COUNT:
-      SET_STATE(STAND_BY)
+      SET_STATE(STAND_BY);
       break;
 
     case PRESTAGE_READY:
-      set_valve(FUEL_PRE, 0);
-      set_valve(OX_PRE, 0);
-      set_valve(N2_CHOKE, 0);   
-      SET_STATE(STAND_BY)
+      valve_n2_choke.set_valve(0);
+      valve_fuel_pre.set_valve(0);
+      valve_ox_pre.set_valve(0);
+      SET_STATE(STAND_BY);
       break;
 
     case PRESTAGE:
-      set_valve(N2_CHOKE, 0);   
-      set_valve(OX_PRE, 0);
-      set_valve(FUEL_PRE, 0);
+      valve_n2_choke.set_valve(0);
+      valve_fuel_pre.set_valve(0);
+      valve_ox_pre.set_valve(0);
       reset_igniter();
-      SET_STATE(COOL_DOWN)
+      SET_STATE(COOL_DOWN);
       shutdown_time = millis();
       break;
 
     case MAINSTAGE:
-      set_valve(N2_CHOKE, 0); 
-      set_valve(OX_PRE, 0);
-      set_valve(FUEL_PRE, 0);
-      SET_STATE(SHUTDOWN)
+      valve_n2_choke.set_valve(0);
+      valve_fuel_pre.set_valve(0);
+      valve_ox_pre.set_valve(0);
+      SET_STATE(SHUTDOWN);
       shutdown_time = millis();
       break;
   }
 }
 
-void run_control() {
+void run_control(){
   long run_time = millis() - start_time - COUNTDOWN_DURATION;
-  SEND(run_time, run_time)
+  SEND(run_time, run_time);
 
   handle_igniter();
 
-#if CONFIGURATION == MK_2
-  if (state != STAND_BY && state != COOL_DOWN && millis() > heartbeat_time + HEARTBEAT_TIMEOUT) {
-    Serial.println(F("Loss of data link"));
-    abort_autosequence();
-  }
-#endif
+  #if CONFIGURATION == MK_2_FULL || CONFIGURATION == MK_2_LOW
+    if (state!=STAND_BY  &&  state!=COOL_DOWN  &&  millis() > heartbeat_time + HEARTBEAT_TIMEOUT){
+      Serial.println(F("Loss of data link"));
+      abort_autosequence();
+    }else
+  #endif
 
-  switch (state) {
+  switch (state){
     case STAND_BY:
-      // State that waits for a person to begin the test
-      if (!sensor_status) {
-        set_lcd_status("Sensor failure");
+      if (!sensor_status){
+        set_lcd_status("Sensor Failure");
       }
       break;
+
     case TERMINAL_COUNT:
-      // Countdown state
       #if CONFIGURATION != DEMO
-      if (!sensor_status) {
-        Serial.println(F("Sensor failure"));
-        abort_autosequence();
-      }
-      else
+        if (!sensor_status){
+          Serial.println(F("Sensor failure"));
+          abort_autosequence();
+        }else
       #endif
-      if (run_time >= PRESTAGE_PREP_TIME) {
-        SET_STATE(PRESTAGE_READY)
-        set_valve(N2_CHOKE, 1);               
-        set_valve(FUEL_PRE, 1);
-        set_valve(OX_PRE, 1);
+      if (run_time >= PRESTAGE_PREP_TIME){
+        valve_fuel_pre.set_valve(1);
+        valve_n2_choke.set_valve(1);
+        valve_ox_pre.set_valve(1);
+        SET_STATE(PRESTAGE_READY);
       }
       break;
+
     case PRESTAGE_READY:
-      // State to wait for ignition after prestage valves are open
-      if (run_time >= PRESTAGE_TIME) {
-        SET_STATE(PRESTAGE)
+      if (run_time >= PRESTAGE_TIME){
         fire_igniter();
+        SET_STATE(PRESTAGE);
       }
       break;
+
     case PRESTAGE:
-      // State to wait for mainstage valves to be opened after ignition
-      if (run_time >= MAINSTAGE_TIME) {
-        SET_STATE(MAINSTAGE)
-        set_valve(FUEL_MAIN, 1);
-        set_valve(OX_MAIN, 1);
+      if (run_time >= MAINSTAGE_TIME){
+        valve_fuel_main.set_valve(1);
+        valve_ox_main.set_valve(1);
+        SET_STATE(MAINSTAGE);
       }
       break;
+
     case MAINSTAGE:
-      // State for active firing of the engine
       #if CONFIGURATION != DEMO
-      // Check that the sensors are still working
-      if (!sensor_status) {
-        Serial.println(F("Sensor failure"));
-        abort_autosequence();
-      }
-      else
+        if (!sensor_status){
+          Serial.println(F("Sensor Failure"));
+          abort_autosequence();
+        }else
       #endif
-      // Check that the coolant temperature has not exceeded the maximum limit
-      if (outlet_temp >= MAX_COOLANT_TEMP) {
-        Serial.println(F("Temperature reached critical level"));
+      if (outlet_temp >= MAX_COOLANT_TEMP){
+        Serial.println(F("Temperature reached critical level. Shuttung down."));
         abort_autosequence();
       }
-      // Check that the engine is producing thrust once mainstage valves are fully open
-      else if (run_time >= THRUST_CHECK_TIME && force < MIN_THRUST) {
-        Serial.println(F("Thrust below critical level"));
+      else if (run_time >= THRUST_CHECK_TIME && force < MIN_THRUST){
+        Serial.println(F("Thrust below critical level. Shutting down."));
         abort_autosequence();
       }
 
-      if (run_time >= RUN_TIME) {
-        SET_STATE(OXYGEN_SHUTDOWN)
-        set_valve(OX_PRE, 0);
+      if (run_time >= RUN_TIME){
+        SET_STATE(OXYGEN_SHUTDOWN);
+        valve_ox_pre.set_valve(0);
         shutdown_time = millis();
       }
       break;
 
     case OXYGEN_SHUTDOWN:
-      // Oxygen prestage valve is closed, others are still open
-      if (millis() >= shutdown_time + OX_LEADTIME) {
-        set_valve(FUEL_PRE, 0);
-        SET_STATE(SHUTDOWN)
+      if (millis() >= shutdown_time + OX_LEADTIME){
+        valve_n2_choke.set_valve(0);
+        valve_fuel_pre.set_valve(0);
+        SET_STATE(SHUTDOWN);
       }
       break;
 
     case SHUTDOWN:
-      // Both prestage valves are closed, others may still be open
-      if (millis() >= shutdown_time + PRE_LEADTIME) {
-        set_valve(N2_CHOKE, 0);   
-        set_valve(OX_MAIN, 0);
-        set_valve(FUEL_MAIN, 0);
-        SET_STATE(COOL_DOWN)
+      if (millis() >= shutdown_time + PRE_LEADTIME){
+        valve_ox_main.set_valve(0);
+        valve_fuel_main.set_valve(0);
+        valve_n2_drain.set_valve(1);
+        SET_STATE(COOL_DOWN);
       }
       break;
 
     case COOL_DOWN:
-      // State that waits for cool-down to take place after a run is complete
-      if (millis() - shutdown_time >= COOLDOWN_TIME) {
-        Serial.println(F("Run finished"));
-        SET_STATE(STAND_BY)
-        start_time = 0;
+      if (!valve_n2_drain.set_valve()){
+        valve_n2_drain.set_valve(1);
       }
-      break;
-
-    case STATIC_TEST_COMPLETE:
-      // State that requires manual input to open Kero valve once static test is completed for the day
-      char state;
-      for (int i=1; i<10; i++){
-        cout << "Are you done test firing for the day? [Y/N]";
-        cin >> state;
-        if (state=='Y'){
-          cout << "Are you sure you're done? [Y/N]";
-          cin >> state;
-          if (state=='Y'){
-            cout << "Draining Kerosene valve...vwooosh";
-            set_valve(KERO_DRAIN, 1);
-            return;
-          }
-          else if (state=='N'){
-            cout << "Let the firing resume!";
-            return;
-          }
-          else{
-            break;
-          }
-        }
-        else if (state=='N'){
-          cout << "Let the firing resume!";
-          return;
-        }
-        else{
-          break;
-        }
+      if (millis() - shutdown_time >= COOLDOWN_TIME){
+        Serial.println(F("Run finished"));
+        valve_n2_drain.set_valve(0);
+        SET_STATE(STAND_BY);
+        start_time = 0;
       }
       break;
   }
