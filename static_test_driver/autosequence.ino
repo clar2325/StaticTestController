@@ -18,11 +18,11 @@
   #define COOLDOWN_TIME       10000       // 10 seconds
 #elseif CONFIGURATION == MK_2_FULL
   #define COUNTDOWN_DURATION  60000       // 1 minute
-  #define RUN_TIME            12000       // 12 seconds
+  #define RUN_TIME            10000       // 10 seconds
   #define COOLDOWN_TIME       60000 * 10  // 10 minutes
 #elseif CONFIGURATION == MK_2_LOW
   #define COUNTDOWN_DURATION  60000       // 1 minute
-  #define RUN_TIME            8000        // 8 seconds
+  #define RUN_TIME            2000        // 2 seconds
   #define COOLDOWN_TIME       60000 * 5   // 5 minutes
 #endif
 
